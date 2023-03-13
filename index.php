@@ -1,21 +1,25 @@
 <?PHP
 /**
-	@class : index.php
+	@class  : index.php
+	@doc	: index file
+	@auther : mongE
+	@version : 1.0, 2023.03.14, create
 */
-include "./inc/dbconn.inc";
+include "./inc/dbconn.inc"; # setting
 ?>
 <meta http-equiv=Content-Type content=text/html; charset=EUC-KR>
-<?PHP
-#include "./com/dbconn.php";
-?>
 <html>
 <head>
-	<title>welcom to mongjoong web api</title>
+	<title>welcom to mTools Api Web site</title>
 </head>
 <body>
 
-	Hello mongjoong web api site mtools------11
-	<br>가나다라
+	<h1>
+		mTools Api Web site
+	</h1>
+	<h2>
+		: 한글 테스트 : 가나다라마
+	</h2>
 	<br>
 <?PHP
 
