@@ -23,9 +23,33 @@ include "./inc/dbconn.inc"; # setting
 	<br>
 	DB TEST ....
 
+<br>https://velog.io/@simchodi/Git-%EC%B4%88%EA%B8%B0%EC%84%B8%ED%8C%85-%EA%B8%B0%EB%B3%B8%EB%AA%85%EB%A0%81%EC%96%B4
+<br>
+<br>1) 윈도우와 맥의 엔터방식 차이로 인한 오류 방지
+<br>git config --global core.autocrlf true 
+<pre>
+2) 사용자 이름, 이메일 주소 설정
+
+git config --global user.name "(본인 이름)"
+git config --global user.email "(본인 이메일)"
+3) 사용자 이름, 이메일 주소 설정 확인
+
+git config --global user.name
+git config --global user.email
+4) 브랜치명 master > main으로 변경
+(master는 노예제도를 연상시킨다고 하여 main으로 사용함)
+
+git config --global init.defaultBranch main
+5) Git 저장소 생성
+(저장소를 만들 폴더로 이동 후 하는 것이 좋음. 현재 디렉토리를 기준으로 저장소가 생성됨)
+
+git init
+
+</pre>
+<br>git config --global user.name "nextia80"
+<br>git config --global user.email "nextia80@gmail.com"
+
 <?PHP
-
-
 
 
 // Create connection
