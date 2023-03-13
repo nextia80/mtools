@@ -21,7 +21,11 @@ include "./inc/dbconn.inc"; # setting
 		: 한글 테스트 : 가나다라마
 	</h2>
 	<br>
+	DB TEST ....
+
 <?PHP
+
+
 
 
 // Create connection
