@@ -1,12 +1,45 @@
-<!DOCTYPE html>
-<html lang="en">
+<?PHP
+include "./inc/dbconn.inc";
+?>
+<meta http-equiv=Content-Type content=text/html; charset=EUC-KR>
+<?PHP
+#include "./com/dbconn.php";
+?>
+<html>
 <head>
-    <meta charset="UTF-8">
-    <meta http-equiv="X-UA-Compatible" content="IE=edge">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>mTools</title>
+	<title>welcom to mongjoong web api</title>
 </head>
 <body>
-    WelCom TO mTools
+
+	Hello mongjoong web api site
+	<br>가나다라
+	<br>
+<?PHP
+
+
+// Create connection
+$conn = new mysqli($servername, $username, $password, $dbname);
+// Check connection
+if ($conn->connect_error) {
+    die("Connection failed: " . $conn->connect_error);
+}
+mysqli_set_charset($conn, 'utf8'); 
+
+$sql = "select * from M_BOARD_1_0";
+$sql = "select * from test_db";
+$result = $conn->query($sql);
+
+if ($result->num_rows > 0) {
+    // output data of each row
+    while($row = $result->fetch_assoc()) {
+        // echo "<br>name: " . $row["ID_M_BOARD"];
+		echo "<br>name: " . $row["name"];
+		
+    }
+} else {
+    echo "0 results";
+}
+$conn->close();
+?>
 </body>
 </html>
