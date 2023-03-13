@@ -1,4 +1,7 @@
 <?PHP
+/**
+	@class : index.php
+*/
 include "./inc/dbconn.inc";
 ?>
 <meta http-equiv=Content-Type content=text/html; charset=EUC-KR>
@@ -11,7 +14,7 @@ include "./inc/dbconn.inc";
 </head>
 <body>
 
-	Hello mongjoong web api site
+	Hello mongjoong web api site mtools------11
 	<br>가나다라
 	<br>
 <?PHP
