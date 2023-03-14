@@ -21,7 +21,7 @@ include "./inc/dbconn.inc"; # setting
 		: 한글 테스트 : 가나다라마
 	</h2>
 	<br>
-	DB TEST --> 
+	DB TEST --> 2
 
 <br>https://velog.io/@simchodi/Git-%EC%B4%88%EA%B8%B0%EC%84%B8%ED%8C%85-%EA%B8%B0%EB%B3%B8%EB%AA%85%EB%A0%81%EC%96%B4
 <br>
