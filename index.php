@@ -16,10 +16,10 @@ include "./inc/siteinfo.inc"; # 기본세팅
 <body>
 
 	<h1>
-		mTools Api Web site
+		mTools Api Web site - mtools
 	</h1>
 	<h2>
-		: 한글 테스트 : 가나다라마
+		: 한글 테스트 : 가나다라마 
 	</h2>
 	<br>
 	DB TEST --> 2
