@@ -5,12 +5,13 @@
 	@auther : mongE
 	@version : 1.0, 2023.03.14, create
 */
-include "./inc/dbconn.inc"; # setting
+include "./inc/dbconn.inc"; # 디비정보
+include "./inc/siteinfo.inc"; # 기본세팅
 ?>
 <meta http-equiv=Content-Type content=text/html; charset=EUC-KR>
 <html>
 <head>
-	<title>welcom to mTools Api Web site</title>
+	<title><?=$_title?></title>
 </head>
 <body>
 
