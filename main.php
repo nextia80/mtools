@@ -18,6 +18,6 @@ include "./inc/fn_function.php"; # 공통 html funciton
     <title><?=$_title?></title>
 </head>
 <body>
-    
+    welcom to mTools
 </body>
 </html>
