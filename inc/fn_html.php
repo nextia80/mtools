@@ -7,6 +7,9 @@
 
 */
 
+function fn_html_header(){
+    echo "<!DOCTYPE html>";
+}
 
 
 ?>
