@@ -19,6 +19,5 @@ include "./inc/fn_function.php"; # 공통 html funciton
 </head>
 <body>
     welcom to mTools
-    1g
 </body>
 </html>
