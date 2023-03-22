@@ -7,7 +7,7 @@
 */
 include "./inc/dbconn.inc"; # 디비정보
 include "./inc/siteinfo.inc"; # 기본세팅
-include "./inc/fn_function.php"; # 공통 html funciton
+include "./inc/fn_html.php"; # 공통 html funciton
 ?>
 <?=fn_html_header()?>
 <html lang="en">
