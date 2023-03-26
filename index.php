@@ -20,5 +20,6 @@ include "./inc/mtoolsApi.php";
 </head>
 <body>
     welcom to mTools
+    TEST !!
 </body>
 </html>
