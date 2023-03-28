@@ -19,9 +19,9 @@ include "./inc/mtoolsApi.php";
     <title><?=$_title?></title>
 </head>
 <body>
-    welcom to mTools
-    TEST !!
-
-    임시 1
+    <h1>welcom to mTools</h1>
+    <br>
+    <br>아파치 서버 설정 
+    <br>/opt/homebrew/etc/httpd/httpd.conf
 </body>
 </html>
