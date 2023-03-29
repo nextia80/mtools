@@ -23,5 +23,7 @@ include "./inc/mtoolsApi.php";
     <br>
     <br>아파치 서버 설정 
     <br>/opt/homebrew/etc/httpd/httpd.conf
+    <br>
+    <br>아웅 하기 싫어 ㅎㅎ
 </body>
 </html>
