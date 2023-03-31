@@ -23,8 +23,7 @@ include "./inc/mtoolsApi.php";
     <br>
     <br>아파치 서버 설정 
     <br>/opt/homebrew/etc/httpd/httpd.conf
+    <br>PHP ini : /opt/homebrew/etc/php/8.2/php.ini
     <br>
-    <br>아웅 하기 싫어 ㅎㅎ
-    오늘은 아파치 세팅!!
 </body>
 </html>
