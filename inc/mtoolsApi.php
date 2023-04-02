@@ -6,7 +6,8 @@
  * @version : 1.0, 2023.03.26, mongE, create
  */
 
-include "./inc/dbconn.inc"; # 디비정보
-include "./inc/siteinfo.inc"; # 기본세팅
-include "./inc/fn_html.php"; # 공통 html funciton
+include "./inc/mToolsInfoDb.inc";   # 디비정보
+include "./inc/mToolsInfoEtc.inc";  # 기본세팅
+include "./inc/mToolsFunction.php";
+include "./inc/mToolsHtmlTag.php"; # 공통 html funciton
 ?>
