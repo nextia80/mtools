@@ -49,8 +49,19 @@ function fn_html_header($_title){
  * @auther : mongE
  * @version : 1.0, 2023.4.4, create
  */
-function fn_html_body(){
-    echo fn_mTag_enter()."<body>";
+function fn_html_body($_body_tag){
+	extract($_body_tag);
+	//extract($body_tag);
+	//$_body_tag = array("topmargin" => "0", "leftmargin" => "0" );
+    echo fn_mTag_enter()."<body";
+	if(isset($topmargin)) {
+		echo " topmarin=".$topmargin;
+	}
+	if(isset($leftmargin)) {
+		echo " topmarin=".$topmargin;
+	}
+
+	echo ">";
 }
 
 /**
