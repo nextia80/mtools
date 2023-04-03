@@ -9,5 +9,5 @@
 include "./inc/mToolsInfoDb.inc";   # 디비정보
 include "./inc/mToolsInfoEtc.inc";  # 기본세팅
 include "./inc/mToolsFunction.php";
-include "./inc/mToolsHtmlTag.php"; # 공통 html funciton
+#include "./inc/mToolsHtmlTag.php"; # 공통 html funciton
 ?>

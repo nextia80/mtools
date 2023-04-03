@@ -27,4 +27,41 @@ function fn_mTag_br() {
 	echo fn_mTag_enter() . "<br>";
 }
 
+
+/**
+ * @class : fn_html_header
+ * @doc   : header code print
+ * @auther : mongE
+ * @version : 1.0, 2023.03.18, create
+ */
+function fn_html_header($_title){
+    echo "<!DOCTYPE html>";
+	echo fn_mTag_enter()."<html>";
+	echo fn_mTag_enter()."<head>";
+	echo fn_mTag_enter()."	<title>" . $_title ."</title>";
+	echo fn_mTag_enter()."</head>";
+
+}
+
+/**
+ * @class : fn_html_body
+ * @doc   : body code print
+ * @auther : mongE
+ * @version : 1.0, 2023.4.4, create
+ */
+function fn_html_body(){
+    echo fn_mTag_enter()."<body>";
+}
+
+/**
+ * @class : fn_html_body
+ * @doc   : body code print
+ * @auther : mongE
+ * @version : 1.0, 2023.4.4, create
+ */
+function fn_html_footer(){
+    echo fn_mTag_enter()."</body>";
+	echo fn_mTag_enter()."</html>";
+}
+
 ?>
