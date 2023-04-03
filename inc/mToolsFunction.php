@@ -51,8 +51,7 @@ function fn_html_header($_title){
  */
 function fn_html_body($_body_tag){
 	extract($_body_tag);
-	//extract($body_tag);
-	//$_body_tag = array("topmargin" => "0", "leftmargin" => "0" );
+
     echo fn_mTag_enter()."<body";
 	if(isset($topmargin)) {
 		echo " topmarin=".$topmargin;
@@ -60,7 +59,6 @@ function fn_html_body($_body_tag){
 	if(isset($leftmargin)) {
 		echo " topmarin=".$topmargin;
 	}
-
 	echo ">";
 }
 
