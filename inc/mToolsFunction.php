@@ -73,4 +73,15 @@ function fn_html_footer(){
 	echo fn_mTag_enter()."</html>";
 }
 
+/**
+ * @calss	: fn_m_markdown
+ * @doc		: 파일을 마크다운으로 변경해준다.
+ * @auther	: mongE
+ * @version	1.0, 2023.4.6, mongE, create
+ */
+function fn_m_markdown($text){
+	//$html = Markdown::defaultTransform($text);
+	//return $html;
+}
+
 ?>
