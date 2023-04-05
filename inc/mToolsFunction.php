@@ -4,7 +4,6 @@
 	@doc	: tag function collaction
 	@auther : mongE
 	@version : 1.0, 2023.03.22, create
-
 */
 
 /**
@@ -16,7 +15,7 @@
 function fn_mTag_enter() {
 	echo "\n";
 }
-
+	
 /**
  * @class 	: fn_mTag_br
  * @doc		: tag br을 화면에 출력한다.
@@ -57,9 +56,10 @@ function fn_html_body($_body_tag){
 		echo " topmarin=".$topmargin;
 	}
 	if(isset($leftmargin)) {
-		echo " topmarin=".$topmargin;
+		echo " leftmargin=".$leftmargin;
 	}
 	echo ">";
+	fn_mTag_enter();
 }
 
 /**
