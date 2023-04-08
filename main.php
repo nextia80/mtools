@@ -1,6 +1,4 @@
-<?php
-
-    /** markdown ************************************************************************/
+<?php    /** markdown ************************************************************************/
     /*
     markdown Ex
     spl_autoload_register(function($class){
@@ -16,7 +14,7 @@
     $_body_tag = array("topmargin" => "0", "leftmargin" => "0" );
     fn_html_body($_body_tag);
 ?>
-    <style>
+<style>
     div {
         border-style:solid;
     } 
