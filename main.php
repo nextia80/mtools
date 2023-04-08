@@ -16,4 +16,26 @@
     $_body_tag = array("topmargin" => "0", "leftmargin" => "0" );
     fn_html_body($_body_tag);
 ?>
-welcom to mTools
+    <style>
+    div {
+        border-style:solid;
+    } 
+
+
+    </style>
+
+    
+    <div class="con" style="display:table; width:800px;">
+        <div style="display:table-row">
+            <div class ="A" style="display:table-cell">A</div>
+            <div class ="B" style="display:table-cell">B</div>
+            <div class ="C" style="display:table-cell">C</div>
+            <div class ="D" style="display:table-cell">D</div>
+        </div>
+        <div style="display:table-row">
+            <div class ="A" style="display:table-cell">A</div>
+            <div class ="B" style="display:table-cell">B</div>
+            <div class ="C" style="display:table-cell">C</div>
+            <div class ="D" style="display:table-cell">D</div>
+        </div>
+    </div>
