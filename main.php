@@ -14,6 +14,32 @@
     $_body_tag = array("topmargin" => "0", "leftmargin" => "0" );
     fn_html_body($_body_tag);
 
+
+# mysql db select sample
+	$sql = "select * from m_test";
+	$result = $conn->query($sql);
+
+	if ($result->num_rows > 0) {
+	echo "<table border=1>";
+	echo "<tr>";
+	echo "<td>id</td>";
+	echo "<td>nm</td>";
+	echo "</tr>";
+		// output data of each row
+		while($row = $result->fetch_assoc()) {
+			echo "<tr>";
+			echo "<td>" . $row["id_test"]."</td>";
+			echo "<td>" . $row["nm_test"]."</td>";
+			echo "</tr>";
+		}
+		echo "</table>";
+	} else {
+		echo "0 results";
+	}
+
+# mysql db table is exist
+	echo fm_isTable($conn, "m_test"); // Table이 존재하는지 확인
+
 	#div sampel
 	#include "./sample/div_table.php";
 	#include "./sample/div_table02.php";

@@ -84,4 +84,19 @@ function fn_m_markdown($text){
 	//return $html;
 }
 
+/**
+ * @class	: fm_isTable
+ * @doc		: 해당 테이블이 있는지 확인한다.
+ * @auther	: mongE
+ * @version 1.0, 2023.4.9, mongE, create
+ */
+function fm_isTable($conn, $tablename) {
+	$sql = "SHOW TABLES LIKE '" . $tablename . "';";
+	$result = $conn->query($sql);
+	if ($result->num_rows > 0) {
+		return true;
+	} else {
+		return false;
+	}
+}
 ?>
