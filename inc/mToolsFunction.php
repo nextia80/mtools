@@ -101,34 +101,12 @@ function fn_is_table($conn, $tablename) {
 }
 
 /**
- * @class	: fn_is_table
- * @doc		: 해당 테이블이 있는지 확인한다.
+ * @class	: fn_run
+ * @doc		: 쿼리 실행한 값을 가져온다.
  * @auther	: mongE
- * @version 1.0, 2023.4.9, mongE, create
+ * @version 1.0, 2023.4.10, mongE, create
  */
-function fn_get_table_val($conn, $sql) {
-	$result = $conn->query($sql);
-
-
-	return $result;
-/*
-	if ($result->num_rows > 0) {
-	echo "<table border=1>";
-	echo "<tr>";
-	echo "<td>id</td>";
-	echo "<td>nm</td>";
-	echo "</tr>";
-		// output data of each row
-		while($row = $result->fetch_assoc()) {
-			echo "<tr>";
-			echo "<td>" . $row["id_test"]."</td>";
-			echo "<td>" . $row["nm_test"]."</td>";
-			echo "</tr>";
-		}
-		echo "</table>";
-	} else {
-		echo "0 results";
-	}
-	*/
+function fn_run($conn, $sql) {
+	return $conn->query($sql);
 }
 ?>

@@ -19,11 +19,14 @@
 	$sql = "select * from m_test";
 	$result = fn_get_table_val($conn, $sql);
 
+
+	
+
+
 	while ($row = mysqli_fetch_array($result)){
 		print_r($row);
 		echo '<br>';
 	}
-
 
    /*
 	if ($result->num_rows > 0) {
