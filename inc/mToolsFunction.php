@@ -99,4 +99,26 @@ function fm_isTable($conn, $tablename) {
 		return false;
 	}
 }
+
+function fm_select($conn, $sql) {
+	$result = $conn->query($sql);
+
+	if ($result->num_rows > 0) {
+	echo "<table border=1>";
+	echo "<tr>";
+	echo "<td>id</td>";
+	echo "<td>nm</td>";
+	echo "</tr>";
+		// output data of each row
+		while($row = $result->fetch_assoc()) {
+			echo "<tr>";
+			echo "<td>" . $row["id_test"]."</td>";
+			echo "<td>" . $row["nm_test"]."</td>";
+			echo "</tr>";
+		}
+		echo "</table>";
+	} else {
+		echo "0 results";
+	}
+}
 ?>
