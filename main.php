@@ -16,9 +16,16 @@
 
 
 # mysql db select sample
-$sql = "select * from m_test";
-	$result = $conn->query($sql);
+	$sql = "select * from m_test";
+	$result = fn_get_table_val($conn, $sql);
 
+	while ($row = mysqli_fetch_array($result)){
+		print_r($row);
+		echo '<br>';
+	}
+
+
+   /*
 	if ($result->num_rows > 0) {
 	echo "<table border=1>";
 	echo "<tr>";
@@ -36,14 +43,14 @@ $sql = "select * from m_test";
 	} else {
 		echo "0 results";
 	}
+	*/
 # mysql db select function sample
 echo "<hr>";	
-	$sql = "select * from m_test";
-	fm_select($conn, $sql);
+
 
 echo "<hr>";
 # mysql db table is exist
-	echo fm_isTable($conn, "m_test"); // Table이 존재하는지 확인
+	echo fn_is_table($conn, "m_test"); // Table이 존재하는지 확인
 
 	#div sampel
 	#include "./sample/div_table.php";

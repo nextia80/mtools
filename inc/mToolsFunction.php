@@ -85,12 +85,12 @@ function fn_m_markdown($text){
 }
 
 /**
- * @class	: fm_isTable
+ * @class	: fn_is_table
  * @doc		: 해당 테이블이 있는지 확인한다.
  * @auther	: mongE
  * @version 1.0, 2023.4.9, mongE, create
  */
-function fm_isTable($conn, $tablename) {
+function fn_is_table($conn, $tablename) {
 	$sql = "SHOW TABLES LIKE '" . $tablename . "';";
 	$result = $conn->query($sql);
 	if ($result->num_rows > 0) {
@@ -100,9 +100,18 @@ function fm_isTable($conn, $tablename) {
 	}
 }
 
-function fm_select($conn, $sql) {
+/**
+ * @class	: fn_is_table
+ * @doc		: 해당 테이블이 있는지 확인한다.
+ * @auther	: mongE
+ * @version 1.0, 2023.4.9, mongE, create
+ */
+function fn_get_table_val($conn, $sql) {
 	$result = $conn->query($sql);
 
+
+	return $result;
+/*
 	if ($result->num_rows > 0) {
 	echo "<table border=1>";
 	echo "<tr>";
@@ -120,5 +129,6 @@ function fm_select($conn, $sql) {
 	} else {
 		echo "0 results";
 	}
+	*/
 }
 ?>
