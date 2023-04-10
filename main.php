@@ -16,16 +16,33 @@
 
 
 # mysql db select sample
+  #* mysqli_fetch_array / fetch_assoc 차이점을 찾아서 정리해보자
 	$sql = "select * from m_test";
-	$result = fn_get_table_val($conn, $sql);
+	$result = fn_run($conn, $sql);
 
+	if ($result->num_rows > 0) {
+		echo "<table border=1>";
+		echo "<tr>";
+		echo "<td>id</td>";
+		echo "<td>nm</td>";
+		echo "</tr>";
 
-	
-
-
-	while ($row = mysqli_fetch_array($result)){
-		print_r($row);
-		echo '<br>';
+		while($row = $result->fetch_assoc()) {
+			echo "<tr>";
+			echo "<td>" . $row["id_test"]."</td>";
+			echo "<td>" . $row["nm_test"]."</td>";
+			echo "</tr>";
+		}
+		echo "</table>";
+/*
+		while ($row = mysqli_fetch_array($result)){
+			print_r($row);
+			echo '<br>';
+		}
+*/
+	}
+	else {
+		echo "0 results";
 	}
 
    /*
