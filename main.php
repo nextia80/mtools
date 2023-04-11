@@ -45,37 +45,55 @@
 		echo "0 results";
 	}
 
-   /*
-	if ($result->num_rows > 0) {
-	echo "<table border=1>";
-	echo "<tr>";
-	echo "<td>id</td>";
-	echo "<td>nm</td>";
-	echo "</tr>";
-		// output data of each row
-		while($row = $result->fetch_assoc()) {
-			echo "<tr>";
-			echo "<td>" . $row["id_test"]."</td>";
-			echo "<td>" . $row["nm_test"]."</td>";
-			echo "</tr>";
-		}
-		echo "</table>";
-	} else {
-		echo "0 results";
-	}
-	*/
-# mysql db select function sample
-echo "<hr>";	
-
-
-echo "<hr>";
+#-------------------------------------------------------------------------------------------------------
 # mysql db table is exist
-	echo fn_is_table($conn, "m_test"); // Table이 존재하는지 확인
+echo "<hr>";
+echo fn_is_table($conn, "m_test"); // Table이 존재하는지 확인
+
+#-------------------------------------------------------------------------------------------------------
+# Table Create And Drop 함수 만들기
+echo "<hr>";
+
+if(fn_is_table($conn, "m_test2")){
+	fn_run($conn, "drop table m_test2");
+}
+/*
+$sql = "";
+$sql .= "CREATE TABLE m_test2";
+$sql .= "(";
+$sql .= "       id_test INT PRIMARY KEY AUTO_INCREMENT";
+$sql .= "	 , nm_test VARCHAR(32) ";
+$sql .= ") ENGINE=INNODB;";
+*/
+$sql = "
+CREATE TABLE m_test2
+(
+       id_test INT PRIMARY KEY AUTO_INCREMENT
+	 , nm_test VARCHAR(32)
+) ENGINE=INNODB;
+";
+
+$result = fn_run($conn, $sql);
+if (fn_is_table($conn, "m_test2")) {
+	echo "<br>create table2";
+} else {
+	echo "<br>error table2";
+}
+
+
+$sql = "INSERT INTO m_test2 (nm_test) VALUES('test1')";
+fn_run($conn, $sql);
+
+
+#INSERT INTO m_test (nm_test) VALUES('test1');
+
+
+
 
 	#div sampel
 	#include "./sample/div_table.php";
 	#include "./sample/div_table02.php";
 	#include "./sample/div_table03.php";
 ?>
-1
+end page
  
