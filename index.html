@@ -14,8 +14,7 @@ setcookie($cookieName, $cookieValue, time()+60, "/"); // 쿠키가 60초 간 지
 */
 
 
-
-fn_html_header($_title);
+fn_header($_title);
 
 // Create connection
 $conn = new mysqli($servername, $username, $password, $dbname);
@@ -26,7 +25,7 @@ if ($conn->connect_error) {
 mysqli_set_charset($conn, 'utf8'); 
     
 include "./main.php"; # 추후에 변경될 예정
-fn_html_footer();
+fn_footer();
 
 $conn->close();
 ?>

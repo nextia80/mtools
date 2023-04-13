@@ -7,51 +7,59 @@
 */
 
 /**
- * @class 	: fn_mTag_enter
+ * @class 	: fn_enter
  * @doc		: 개행문자 `\n`을 화면에 출력한다.
  * @auther	: mongE
  * @version	: 1.0, 2023.04.03, create
+ *            1.1, 2023.04.13, modify
+ *               - 함수명 변경 : fn_mTag_enter -> fn_enter
  */
-function fn_mTag_enter() {
+function fn_enter() {
 	echo "\n";
 }
 	
 /**
- * @class 	: fn_mTag_br
+ * @class 	: fn_br
  * @doc		: tag br을 화면에 출력한다.
  * @auther	: mongE
  * @version	: 1.0, 2023.04.03, create
+ *            1.1, 2023.04.13, modify
+ *            - 함수명 변경 : fn_mTag_br -> fn_br
  */
-function fn_mTag_br() {
-	echo fn_mTag_enter() . "<br>";
+function fn_br() {
+	echo fn_enter() . "<br>";
 }
 
 
 /**
- * @class : fn_html_header
+ * @class : fn_header
  * @doc   : header code print
  * @auther : mongE
  * @version : 1.0, 2023.03.18, create
+ *            1.1, 2023.03.13, modify
+ *            - 함수명 변경 : fn_header
  */
-function fn_html_header($_title){
+function fn_header($_title){
     echo "<!DOCTYPE html>";
-	echo fn_mTag_enter()."<html>";
-	echo fn_mTag_enter()."<head>";
-	echo fn_mTag_enter()."	<title>" . $_title ."</title>";
-	echo fn_mTag_enter()."</head>";
+	echo fn_enter()."<html>";
+	echo fn_enter()."<head>";
+	echo fn_enter()."	<title>" . $_title ."</title>";
+	echo fn_enter()."</head>";
 
 }
 
 /**
- * @class : fn_html_body
+ * @class : fn_body
  * @doc   : body code print
  * @auther : mongE
- * @version : 1.0, 2023.4.4, create
+ * @version : 1.0, 2023.04.04, create
+ *            1.1, 2023.04.13, modify
+ *            - 함수명 변경 : fn_html_body -> fn_body
  */
-function fn_html_body($_body_tag){
+function fn_body($_body_tag){
 	extract($_body_tag);
 
-    echo fn_mTag_enter()."<body";
+    echo fn_enter()."<body";
 	if(isset($topmargin)) {
 		echo " topmarin=".$topmargin;
 	}
@@ -59,29 +67,20 @@ function fn_html_body($_body_tag){
 		echo " leftmargin=".$leftmargin;
 	}
 	echo ">";
-	fn_mTag_enter();
+	fn_enter();
 }
 
 /**
- * @class : fn_html_body
- * @doc   : body code print
+ * @class : fn_footer
+ * @doc   : footer code print
  * @auther : mongE
- * @version : 1.0, 2023.4.4, create
+ * @version : 1.0, 2023.04.04, create
+ *            1.1, 2023.04.13, modify
+ *            - 함수명 변경 : fn_html_footer -> fn_footer
  */
-function fn_html_footer(){
-    echo fn_mTag_enter()."</body>";
-	echo fn_mTag_enter()."</html>";
-}
-
-/**
- * @calss	: fn_m_markdown
- * @doc		: 파일을 마크다운으로 변경해준다.
- * @auther	: mongE
- * @version	1.0, 2023.4.6, mongE, create
- */
-function fn_m_markdown($text){
-	//$html = Markdown::defaultTransform($text);
-	//return $html;
+function fn_footer(){
+    echo fn_enter()."</body>";
+	echo fn_enter()."</html>";
 }
 
 /**
@@ -109,4 +108,15 @@ function fn_is_table($conn, $tablename) {
 function fn_run($conn, $sql) {
 	return $conn->query($sql);
 }
+
+/**
+ * @class	: fn_get_run
+ * @doc		: 쿼리 실행한후 결과값의 메세제를 출력한다.
+ * @auther	: mongE
+ * @version 1.0, 2023.4.13, mongE, create
+ */
+function fn_get_run($conn, $sql) {
+	return $conn->query($sql);
+}
+
 ?>
