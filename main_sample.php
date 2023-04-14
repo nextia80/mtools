@@ -109,4 +109,7 @@ if(!isset($_COOKIE[$cookieName])) { // 해당 쿠키가 존재하지 않을 때
 	echo "{$cookieName}라는 이름의 쿠키가 생성되었으며, 생성된 값은 '".$_COOKIE[$cookieName]."'입니다.";
 }
 */
+
 ?>
+
+test
