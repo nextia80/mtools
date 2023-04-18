@@ -12,3 +12,13 @@ fn_body($_body_tag);
 <br>git config --global user.email "nextia80@gmail.com"
 <br>
 <br>
+
+1. DB 설정
+2. Create / Drop
+3. select 
+4. insert 
+5. update
+6. delete
+7. session
+
+8. script 1 th'
