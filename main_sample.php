@@ -111,5 +111,19 @@ if(!isset($_COOKIE[$cookieName])) { // 해당 쿠키가 존재하지 않을 때
 */
 
 ?>
-11
-test
+<br>
+    <h2>git 초기 설정</h2>
+<br>git config --global user.name "nextia80"
+<br>git config --global user.email "nextia80@gmail.com"
+<br>
+<br>1. DB 설정
+<br>2. Create / Drop
+<br>3. select 
+<br>4. insert 
+<br>5. update
+<br>6. delete
+<br>7. session
+<br>8. script 1 th'
+
+<br> TEST !! 
+<br>
