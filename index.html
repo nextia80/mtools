@@ -12,10 +12,7 @@ $cookieName = "city";
 $cookieValue = "서울";
 setcookie($cookieName, $cookieValue, time()+60, "/"); // 쿠키가 60초 간 지속됨.
 */
-
-
 fn_header($_title);
-
 // Create connection
 $conn = new mysqli($servername, $username, $password, $dbname);
 // Check connection

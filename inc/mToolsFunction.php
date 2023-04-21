@@ -45,9 +45,9 @@ function fn_header($_title){
 	echo fn_enter()."<head>";
 	echo fn_enter()."	<title>" . $_title ."</title>";
 	echo fn_enter()."</head>";
+	echo fn_enter()."<script src='./inc/jquery-3.6.4.js'></script>";
 
 }
-
 /**
  * @class : fn_body
  * @doc   : body code print
