@@ -26,8 +26,6 @@ $(document).ready(function() {
 });
 </script>
 
-
-
 <?PHP
 $_body_tag = array("topmargin" => "0", "leftmargin" => "10" );
 fn_body($_body_tag);
@@ -49,3 +47,40 @@ fn_body($_body_tag);
 </table>
 </form>
 <div id="message"></div>
+
+<br>
+<br>
+DB 설계
+<pre>
+회원가입
+m_mem
+  (PK) id_mem 아이디(시쿼스)
+  st_mem 아이디(커스텀)
+  nm_mem 이름
+  yn_use 사용여부
+  yn_del 삭제여부
+  (FK) id_grp 권한레벨
+  id_insert
+  dt_insert
+  id_update
+  dt_update
+
+m_grp
+  (PK) id_grp
+  nm_grp
+  yn_use
+  id_insert
+  dt_insert
+  id_update
+  dt_update
+
+m_menu
+  (PK) id_memu
+  nm_menu
+  yn_use
+  id_insert
+  dt_insert
+  id_update
+  dt_update
+  
+</pre>
