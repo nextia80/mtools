@@ -82,5 +82,15 @@ m_menu
   dt_insert
   id_update
   dt_update
+
+m_grp_menu
+  id_menu
+  id_grp
+  id_mem
+  yn_use
+  id_insert
+  dt_insert
+  id_update
+  dt_update
   
 </pre>
