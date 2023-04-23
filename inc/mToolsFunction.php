@@ -14,7 +14,7 @@
  *            1.1, 2023.04.13, modify
  *               - 함수명 변경 : fn_mTag_enter -> fn_enter
  */
-function fn_enter() {
+function fn_newLine() {
 	echo "\n";
 }
 	
@@ -27,7 +27,7 @@ function fn_enter() {
  *            - 함수명 변경 : fn_mTag_br -> fn_br
  */
 function fn_br() {
-	echo fn_enter() . "<br>";
+	echo fn_newLine() . "<br>";
 }
 
 
@@ -41,11 +41,11 @@ function fn_br() {
  */
 function fn_header($_title){
     echo "<!DOCTYPE html>";
-	echo fn_enter()."<html>";
-	echo fn_enter()."<head>";
-	echo fn_enter()."	<title>" . $_title ."</title>";
-	echo fn_enter()."</head>";
-	echo fn_enter()."<script src='./inc/jquery-3.6.4.js'></script>";
+	echo fn_newLine()."<html>";
+	echo fn_newLine()."<head>";
+	echo fn_newLine()."	<title>" . $_title ."</title>";
+	echo fn_newLine()."</head>";
+	echo fn_newLine()."<script src='./inc/jquery-3.6.4.js'></script>";
 
 }
 /**
@@ -59,7 +59,7 @@ function fn_header($_title){
 function fn_body($_body_tag){
 	extract($_body_tag);
 
-    echo fn_enter()."<body";
+    echo fn_newLine()."<body";
 	if(isset($topmargin)) {
 		echo " topmarin=".$topmargin;
 	}
@@ -67,7 +67,7 @@ function fn_body($_body_tag){
 		echo " leftmargin=".$leftmargin;
 	}
 	echo ">";
-	fn_enter();
+	fn_newLine();
 }
 
 /**
@@ -79,8 +79,8 @@ function fn_body($_body_tag){
  *            - 함수명 변경 : fn_html_footer -> fn_footer
  */
 function fn_footer(){
-    echo fn_enter()."</body>";
-	echo fn_enter()."</html>";
+    echo fn_newLine()."</body>";
+	echo fn_newLine()."</html>";
 }
 
 /**

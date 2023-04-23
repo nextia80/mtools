@@ -6,7 +6,6 @@
     @version : 1.0, 2023.04.01, create
 */
 include "./inc/mToolsApi.php";
-fn_header($_title);
 
 /** DB module -- (S) */
 $conn = new mysqli($servername, $username, $password, $dbname); // Create connection
@@ -17,7 +16,7 @@ if ($conn->connect_error) {
 mysqli_set_charset($conn, 'utf8'); 
 /** DB module -- (E) */
 
-include "./mtools_index.php"; # 추후에 변경될 예정
+include "./m_index.php"; # 추후에 변경될 예정
 
 fn_footer();
 $conn->close(); // DB connect off code
