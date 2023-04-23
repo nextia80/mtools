@@ -6,23 +6,19 @@
     @version : 1.0, 2023.04.01, create
 */
 include "./inc/mToolsApi.php";
-
-/*
-$cookieName = "city";
-$cookieValue = "서울";
-setcookie($cookieName, $cookieValue, time()+60, "/"); // 쿠키가 60초 간 지속됨.
-*/
 fn_header($_title);
-// Create connection
-$conn = new mysqli($servername, $username, $password, $dbname);
+
+/** DB module -- (S) */
+$conn = new mysqli($servername, $username, $password, $dbname); // Create connection
 // Check connection
 if ($conn->connect_error) {
     die("Connection failed: " . $conn->connect_error);
 }
 mysqli_set_charset($conn, 'utf8'); 
-    
-include "./main.php"; # 추후에 변경될 예정
-fn_footer();
+/** DB module -- (E) */
 
-$conn->close();
+include "./mtools_index.php"; # 추후에 변경될 예정
+
+fn_footer();
+$conn->close(); // DB connect off code
 ?>
