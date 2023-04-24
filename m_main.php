@@ -166,47 +166,83 @@ select user_id, AES_DECRYPT(unhex(password), 'c') from mtools.encrypt_test;
 ******
 drop table m_mem;
 create table m_mem (
-    id_mem int PRIMARY KEY AUTO_INCREMENT   COMMENT 'MEM ID'
-  , st_mem varchar(30) not null             COMMENT 'MEM 식별 ID'
-  , nm_mem varchar(300) not null            COMMENT 'MEM 이름'
-  , pw_mem varchar(300) not null            COMMENT '비밀번호'
-  , yn_use char(2) default 'Y'              COMMENT '사용여부'
-  , yn_del char(2) default 'Y'              COMMENT '삭제여부'
-  , id_grp varchar(10)                      COMMENT '그룹ID'
-  , id_insert varchar(30)                   COMMENT '입력자'
-  , dt_insert DATETIME                      COMMENT '입력시간'
-  , id_update varchar(30)                   COMMENT '수정자'
-  , dt_update DATETIME                      COMMENT '수정시간'
+    id_mem int PRIMARY KEY AUTO_INCREMENT         COMMENT 'MEM ID'
+  , st_mem varchar(30) not null                   COMMENT 'MEM 식별 ID'
+  , nm_mem varchar(300) not null                  COMMENT 'MEM 이름'
+  , pw_mem varchar(300) not null                  COMMENT '비밀번호'
+  , id_grp varchar(10)                            COMMENT '그룹ID'
+  , yn_use char(2) default 'Y'                    COMMENT '사용여부'
+  , yn_del char(2) default 'N'                    COMMENT '삭제여부'
+  , id_insert varchar(30)                         COMMENT '입력자'
+  , dt_insert DATETIME default CURRENT_TIMESTAMP  COMMENT '입력시간'
+  , id_update varchar(30)                         COMMENT '수정자'
+  , dt_update DATETIME default CURRENT_TIMESTAMP  COMMENT '수정시간'
 )
 comment 'mTools member table'
 ENGINE=INNODB
 ;
+INSERT INTO m_mem( st_mem, nm_mem, pw_mem, id_grp, yn_use, yn_del, id_insert, id_update) VALUES ('admin', '관리자', hex(aes_encrypt('qwe123@11', 'MTOOLS_KEY')), '0', 'Y', 'N', 'MIG', 'MIG');
+INSERT INTO m_mem( st_mem, nm_mem, pw_mem, id_grp, yn_use, yn_del, id_insert, id_update) VALUES ('nextia80', '유진석', hex(aes_encrypt('qwe123@11', 'MTOOLS_KEY')), '1', 'Y', 'N', 'MIG', 'MIG');
+COMMIT;
+-- UPDATE m_mem SET id_update = 'admin' , dt_update = now() WHERE st_mem = 'admin';
+-- commit;
+SELECT id_mem, st_mem, nm_mem, AES_DECRYPT(unhex(pw_mem), 'MTOOLS_KEY') AS pw_mem
+     , id_grp, yn_use, yn_del
+     , id_insert, DATE_FORMAT(dt_insert,'%Y-%m-%d %H:%i%s') AS dt_insert
+     , id_update, DATE_FORMAT(dt_update,'%Y-%m-%d %H:%i%s') AS dt_update
+  FROM m_mem
+;
+
 drop table m_grp;
 create table m_grp (
-    id_grp varchar(30) PRIMARY KEY          COMMENT 'GRP ID'
-  , nm_grp varchar(300) not null            COMMENT 'GRP 이름'
-  , yn_use char(2) default 'Y'              COMMENT '사용여부'
-  , id_insert varchar(30)                   COMMENT '입력자'
-  , dt_insert DATETIME                      COMMENT '입력시간'
-  , id_update varchar(30)                   COMMENT '수정자'
-  , dt_update DATETIME                      COMMENT '수정시간'
+    id_grp varchar(30) PRIMARY KEY               COMMENT 'GRP ID'
+  , nm_grp varchar(300) not null                 COMMENT 'GRP 이름'
+  , yn_use char(2) default 'Y'                   COMMENT '사용여부'
+  , id_insert varchar(30)                        COMMENT '입력자'
+  , dt_insert DATETIME default CURRENT_TIMESTAMP COMMENT '입력시간'
+  , id_update varchar(30)                        COMMENT '수정자'
+  , dt_update DATETIME default CURRENT_TIMESTAMP COMMENT '수정시간'
 )
 comment 'mTools group table'
 ENGINE=INNODB
 ;
 
+INSERT INTO m_grp ( id_grp, nm_grp, yn_use, id_insert, id_update) values ('0', '관리자', 'Y', 'MIG', 'MIG');
+INSERT INTO m_grp ( id_grp, nm_grp, yn_use, id_insert, id_update) values ('1', '사용자', 'Y', 'MIG', 'MIG');
+INSERT INTO m_grp ( id_grp, nm_grp, yn_use, id_insert, id_update) values ('8', '중지', 'Y', 'MIG', 'MIG');
+INSERT INTO m_grp ( id_grp, nm_grp, yn_use, id_insert, id_update) values ('9', '삭제', 'Y', 'MIG', 'MIG');
+commit;
+
+SELECT *
+  FROM m_grp
+;
+
+SELECT m.id_mem, m.st_mem, m.nm_mem, AES_DECRYPT(unhex(m.pw_mem), 'MTOOLS_KEY') AS pw_mem
+              , m.id_grp, g.nm_grp , m.yn_use, m.yn_del    
+              , m.id_insert, DATE_FORMAT(m.dt_insert,'%Y-%m-%d %H:%i%s') AS dt_insert
+              , m.id_update, DATE_FORMAT(m.dt_update,'%Y-%m-%d %H:%i%s') AS dt_update
+           FROM m_mem m
+LEFT OUTER JOIN m_grp g
+             ON m.id_grp = g.id_grp
+            AND g.yn_use = 'Y'
+           WHERE m.yn_use ='Y'
+             AND m.yn_del  = 'N'
+             AND m.st_mem = 'nextia80'
+;
+
+
 drop table m_menu;
 create table m_menu (
-    id_menu varchar(30) PRIMARY KEY         COMMENT 'GRP ID'
-  , nm_menu varchar(300) not null           COMMENT 'GRP 이름'
-  , id_parent_menu varchar(30)              COMMENT '부모 GRP ID'
-  , st_lvl         varchar(10)              COMMENT 'menu levle'
-  , st_ord         varchar(255)             COMMENT 'memu order'
-  , yn_use char(2) default 'Y'              COMMENT '사용여부'
-  , id_insert varchar(30)                   COMMENT '입력자'
-  , dt_insert DATETIME                      COMMENT '입력시간'
-  , id_update varchar(30)                   COMMENT '수정자'
-  , dt_update DATETIME                      COMMENT '수정시간'
+    id_menu varchar(30) PRIMARY KEY              COMMENT 'GRP ID'
+  , nm_menu varchar(300) not null                COMMENT 'GRP 이름'
+  , id_parent_menu varchar(30)                   COMMENT '부모 GRP ID'
+  , st_lvl         varchar(10)                   COMMENT 'menu levle'
+  , st_ord         varchar(255)                  COMMENT 'memu order'
+  , yn_use char(2) default 'Y'                   COMMENT '사용여부'
+  , id_insert varchar(30)                        COMMENT '입력자'
+  , dt_insert DATETIME default CURRENT_TIMESTAMP COMMENT '입력시간'
+  , id_update varchar(30)                        COMMENT '수정자'
+  , dt_update DATETIME default CURRENT_TIMESTAMP COMMENT '수정시간'
 )
 comment 'mTools menu table'
 ENGINE=INNODB
