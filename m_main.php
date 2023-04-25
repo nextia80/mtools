@@ -233,11 +233,13 @@ LEFT OUTER JOIN m_grp g
 
 drop table m_menu;
 create table m_menu (
-    id_menu varchar(30) PRIMARY KEY              COMMENT 'GRP ID'
-  , nm_menu varchar(300) not null                COMMENT 'GRP 이름'
-  , id_parent_menu varchar(30)                   COMMENT '부모 GRP ID'
-  , st_lvl         varchar(10)                   COMMENT 'menu levle'
-  , st_ord         varchar(255)                  COMMENT 'memu order'
+    id_menu int PRIMARY KEY AUTO_INCREMENT       COMMENT 'menu'
+  , id_parent_menu int default 0                 COMMENT 'parent menu id'
+  , nm_menu varchar(300) not null                COMMENT 'menu name'
+  , st_lvl         varchar(10)   default '1'     COMMENT 'menu levle'
+  , st_ord         varchar(2000) default '1000'  COMMENT 'memu order'
+  , st_pass        varchar(2000)                 COMMENT 'pass url'
+  , st_type        varchar(10)                   COMMENT 'menu type:M메뉴/P:프로그램'
   , yn_use char(2) default 'Y'                   COMMENT '사용여부'
   , id_insert varchar(30)                        COMMENT '입력자'
   , dt_insert DATETIME default CURRENT_TIMESTAMP COMMENT '입력시간'
@@ -247,6 +249,49 @@ create table m_menu (
 comment 'mTools menu table'
 ENGINE=INNODB
 ;
+
+INSERT INTO m_menu ( id_parent_menu, nm_menu, st_lvl, st_ord, st_pass, st_type, yn_use, id_insert, id_update) values (0, 'HOME',   '1', '1001'    , '', 'M', 'Y', 'MIG', 'MIG');
+INSERT INTO m_menu ( id_parent_menu, nm_menu, st_lvl, st_ord, st_pass, st_type, yn_use, id_insert, id_update) values (0, 'ABOUT',  '1', '1001'    , '', 'M', 'Y', 'MIG', 'MIG');
+INSERT INTO m_menu ( id_parent_menu, nm_menu, st_lvl, st_ord, st_pass, st_type, yn_use, id_insert, id_update) values (2, 'ABOUT-3', '2', '10011004', '', 'M', 'Y', 'MIG', 'MIG');
+INSERT INTO m_menu ( id_parent_menu, nm_menu, st_lvl, st_ord, st_pass, st_type, yn_use, id_insert, id_update) values (2, 'ABOUT-1', '2', '10011001', '', 'M', 'Y', 'MIG', 'MIG');
+INSERT INTO m_menu ( id_parent_menu, nm_menu, st_lvl, st_ord, st_pass, st_type, yn_use, id_insert, id_update) values (2, 'ABOUT-2', '2', '10011002', '', 'M', 'Y', 'MIG', 'MIG');
+INSERT INTO m_menu ( id_parent_menu, nm_menu, st_lvl, st_ord, st_pass, st_type, yn_use, id_insert, id_update) values (2, 'ABOUT-2', '2', '10011003', '', 'M', 'N', 'MIG', 'MIG');
+INSERT INTO m_menu ( id_parent_menu, nm_menu, st_lvl, st_ord, st_pass, st_type, yn_use, id_insert, id_update) values (0, 'ADMIN',   '1', '1001'    , '', 'M', 'Y', 'MIG', 'MIG');
+INSERT INTO m_menu ( id_parent_menu, nm_menu, st_lvl, st_ord, st_pass, st_type, yn_use, id_insert, id_update) values (6, 'ADMIN-4',   '2', '10011004'    , '', 'M', 'Y', 'MIG', 'MIG');
+INSERT INTO m_menu ( id_parent_menu, nm_menu, st_lvl, st_ord, st_pass, st_type, yn_use, id_insert, id_update) values (6, 'ADMIN-3',   '2', '10011003'    , '', 'M', 'Y', 'MIG', 'MIG');
+INSERT INTO m_menu ( id_parent_menu, nm_menu, st_lvl, st_ord, st_pass, st_type, yn_use, id_insert, id_update) values (6, 'ADMIN-2',   '2', '10011002'    , '', 'M', 'Y', 'MIG', 'MIG');
+INSERT INTO m_menu ( id_parent_menu, nm_menu, st_lvl, st_ord, st_pass, st_type, yn_use, id_insert, id_update) values (6, 'ADMIN-1',   '2', '10011001'    , '', 'M', 'Y', 'MIG', 'MIG');
+INSERT INTO m_menu ( id_parent_menu, nm_menu, st_lvl, st_ord, st_pass, st_type, yn_use, id_insert, id_update) values (0, 'LOGIN', '1', '1001', '', 'P', 'Y', 'MIG', 'MIG');
+INSERT INTO m_menu ( id_parent_menu, nm_menu, st_lvl, st_ord, st_pass, st_type, yn_use, id_insert, id_update) values (0, 'LOGOUT', '1', '1001', '', 'P', 'Y', 'MIG', 'MIG');
+
+INSERT INTO m_menu ( id_parent_menu, nm_menu, st_lvl, st_ord, st_pass, st_type, yn_use, id_insert, id_update) values (2, 'ABOUT-1-1', '3', '100110011001', '', 'M', 'Y', 'MIG', 'MIG');
+INSERT INTO m_menu ( id_parent_menu, nm_menu, st_lvl, st_ord, st_pass, st_type, yn_use, id_insert, id_update) values (2, 'ABOUT-2-1', '3', '100110021001', '', 'M', 'Y', 'MIG', 'MIG');
+INSERT INTO m_menu ( id_parent_menu, nm_menu, st_lvl, st_ord, st_pass, st_type, yn_use, id_insert, id_update) values (2, 'ABOUT-3-2', '3', '100110041002', '', 'M', 'Y', 'MIG', 'MIG');
+INSERT INTO m_menu ( id_parent_menu, nm_menu, st_lvl, st_ord, st_pass, st_type, yn_use, id_insert, id_update) values (2, 'ABOUT-3-1', '3', '100110041001', '', 'M', 'Y', 'MIG', 'MIG');
+commit;
+;
+
+WITH r AS (
+SELECT m.id_menu
+     , CASE WHEN m.id_parent_menu = 0 THEN m.id_menu ELSE m.id_parent_menu END AS id_parent_menu2
+     , m.id_parent_menu
+     , m.nm_menu
+     , m.st_lvl
+     , m.st_ord, m.st_pass
+     , m.st_type,m.yn_use, m.id_insert, m.dt_insert , m.id_update, m.dt_update
+ FROM m_menu m
+ WHERE m.st_type = 'M'
+)
+SELECT *
+  FROM r m
+ WHERE m.yn_use ='Y'
+ORDER BY id_parent_menu2  asc, st_ord asc
+;
+
+
+
+
+
 
 m_grp_menu
   id_menu
