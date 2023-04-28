@@ -290,12 +290,6 @@ ORDER BY id_parent_menu2  asc, st_ord asc
 
 
 
-
-
-
-
-
-
 m_grp_menu
   id_menu
   id_grp
