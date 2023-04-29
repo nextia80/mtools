@@ -288,7 +288,7 @@ SELECT *
 ORDER BY id_parent_menu2  asc, st_ord asc
 ;
 
-
+-- 앞으로 만들어야 할 테이블
 m_grp_menu
   id_menu
   id_grp
