@@ -288,6 +288,7 @@ SELECT *
 ORDER BY id_parent_menu2  asc, st_ord asc
 ;
 
+ㅁㄴㅇㄹ
 -- 앞으로 만들어야 할 테이블    ggggg 
 m_grp_menu
   id_menu
@@ -299,6 +300,6 @@ m_grp_menu
   id_update
   dt_update
 
-
+asdfasdfasdf
 
 </pre>
