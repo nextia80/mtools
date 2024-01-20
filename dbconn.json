@@ -1,0 +1,9 @@
+{
+  "ID":"testID",
+  "buyerNm":"testName",
+  "buyerPhoneNum":"11111111111111",
+  "goodsData":{
+    "goodsNm":"testGoods",
+    "price":1000
+  }
+}

@@ -1,0 +1,26 @@
+<?PHP
+/**
+    @class   : index.html
+    @doc     : 인덱스파일
+    @auther  : mongE
+    @version : 1.0, 2023.04.01, create
+*/
+include "./inc/mToolsApi.php";
+
+/** DB module -- (S) */
+$conn = new mysqli($servername, $username, $password, $dbname); // Create connection
+// Check connection
+if ($conn->connect_error) {
+    die("Connection failed: " . $conn->connect_error);
+} else {
+    echo "OK dbconn";
+}
+mysqli_set_charset($conn, 'utf8'); 
+/** DB module -- (E) */
+
+//include "./m_index.php"; # 추후에 변경될 예정
+include "./main_sample.php"; # 추후에 변경될 예정
+
+fn_footer();
+$conn->close(); // DB connect off code
+?>

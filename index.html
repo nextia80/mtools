@@ -6,18 +6,11 @@
     @version : 1.0, 2023.04.01, create
 */
 include "./inc/mToolsApi.php";
+$conn = fn_start_dbconn($servername, $username, $password, $dbname);
+mysqli_set_charset($conn, 'utf8');
 
-/** DB module -- (S) */
-$conn = new mysqli($servername, $username, $password, $dbname); // Create connection
-// Check connection
-if ($conn->connect_error) {
-    die("Connection failed: " . $conn->connect_error);
-}
-mysqli_set_charset($conn, 'utf8'); 
-/** DB module -- (E) */
-
-include "./m_index.php"; # 추후에 변경될 예정
+include "./index.php";
 
 fn_footer();
-$conn->close(); // DB connect off code
+fn_close_dbconn($conn);
 ?>
