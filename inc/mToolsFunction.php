@@ -234,4 +234,8 @@ function fn_show_result($conn, $resultm, $param) {
 
 }
 
+
+function fn_space($cnt) {
+    for($i = 0 ; $i < $cnt ; $i++) fn_echo("&nbsp;");
+}
 ?>
