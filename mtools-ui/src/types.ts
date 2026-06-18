@@ -40,6 +40,7 @@ export type TerminalLine = TerminalLineDraft & {
 
 export type CalendarEvent = {
   id: string
+  calendarKey: number | null
   calendarId: string
   calendarName: string
   calendarBackgroundColor: string | null

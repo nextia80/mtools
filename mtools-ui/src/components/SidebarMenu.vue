@@ -41,8 +41,8 @@ const formatMdMenuFileName = (name: string) =>
         type="button"
         @click="$emit('setActiveView', 'home')"
       >
-        <span class="menu-icon">H</span>
-        <strong>홈</strong>
+        <span class="menu-icon">1</span>
+        <strong>터미널</strong>
       </button>
       <button
         class="primary-menu-item"
@@ -50,7 +50,7 @@ const formatMdMenuFileName = (name: string) =>
         type="button"
         @click="$emit('setActiveView', 'board')"
       >
-        <span class="menu-icon">B</span>
+        <span class="menu-icon">2</span>
         <strong>게시판</strong>
       </button>
       <button
@@ -59,7 +59,7 @@ const formatMdMenuFileName = (name: string) =>
         type="button"
         @click="$emit('setActiveView', 'member')"
       >
-        <span class="menu-icon">M</span>
+        <span class="menu-icon">3</span>
         <strong>회원관리</strong>
       </button>
       <button
@@ -68,7 +68,7 @@ const formatMdMenuFileName = (name: string) =>
         type="button"
         @click="$emit('setActiveView', 'schedule')"
       >
-        <span class="menu-icon">S</span>
+        <span class="menu-icon">4</span>
         <strong>일정관리</strong>
       </button>
       <button
@@ -77,7 +77,7 @@ const formatMdMenuFileName = (name: string) =>
         type="button"
         @click="$emit('setActiveView', 'swagger')"
       >
-        <span class="menu-icon">SW</span>
+        <span class="menu-icon">5</span>
         <strong>API 스웨거</strong>
       </button>
       <button
@@ -86,7 +86,7 @@ const formatMdMenuFileName = (name: string) =>
         type="button"
         @click="$emit('setActiveView', 'api')"
       >
-        <span class="menu-icon">API</span>
+        <span class="menu-icon">6</span>
         <strong>API 테스트</strong>
       </button>
       <div class="docs-menu-row">
@@ -96,7 +96,7 @@ const formatMdMenuFileName = (name: string) =>
           type="button"
           @click="$emit('setActiveView', 'docs')"
         >
-          <span class="menu-icon">MD</span>
+          <span class="menu-icon">7</span>
           <strong>일자별LOG <span class="menu-count">({{ mdFiles.length }})</span></strong>
         </button>
         <button class="refresh-button compact docs-inline-refresh" type="button" @click="$emit('refreshMdFiles')">

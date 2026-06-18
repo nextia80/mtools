@@ -13,7 +13,9 @@ import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
+import java.util.HashMap;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
@@ -136,36 +138,53 @@ public class GoogleCalendarService {
 	}
 
 	public List<CalendarEvent> fetchEvents(Instant timeMin, Instant timeMax) throws IOException {
-		return fetchEvents(timeMin, timeMax, null);
+		return fetchEvents(timeMin, timeMax, (List<Integer>) null);
 	}
 
 	public List<CalendarEvent> fetchEvents(Instant timeMin, Instant timeMax, Integer calendarKey)
 			throws IOException {
+		if (calendarKey == null) {
+			return fetchEvents(timeMin, timeMax, (List<Integer>) null);
+		}
+
+		return fetchEvents(timeMin, timeMax, List.of(calendarKey));
+	}
+
+	public List<CalendarEvent> fetchEvents(Instant timeMin, Instant timeMax, List<Integer> calendarKeys)
+			throws IOException {
 		Credential credential = getValidCredential();
 		com.google.api.services.calendar.Calendar googleCalendar = buildGoogleCalendar(credential);
 		List<CalendarListEntry> calendars = listVisibleCalendars(googleCalendar);
+		Map<String, Integer> calendarKeyMap = buildCalendarKeyMap(calendars);
 		List<CalendarEvent> result = new ArrayList<>();
 
-		if (calendarKey != null) {
-			CalendarListEntry calendarEntry = findCalendarByKey(calendars, calendarKey);
+		if (calendarKeys != null && !calendarKeys.isEmpty()) {
+			for (Integer calendarKey : calendarKeys) {
+				CalendarListEntry calendarEntry = findCalendarByKey(calendars, calendarKey);
 
-			if (calendarEntry == null) {
-				throw new IllegalArgumentException("캘린더 목록 키를 찾을 수 없습니다: " + calendarKey);
+				if (calendarEntry == null) {
+					throw new IllegalArgumentException(
+							"캘린더를 찾을 수 없습니다: " + calendarKey + ". (이름이 \""
+									+ calendarKey + ".\" 로 시작하는지 gc c 로 확인하세요)"
+					);
+				}
+
+				result.addAll(fetchEventsFromCalendar(
+						googleCalendar,
+						calendarEntry,
+						timeMin,
+						timeMax,
+						calendarKeyMap
+				));
 			}
-
-			result.addAll(fetchEventsFromCalendar(
-					googleCalendar,
-					calendarEntry,
-					timeMin,
-					timeMax
-			));
 		} else {
 			for (CalendarListEntry calendarEntry : calendars) {
 				result.addAll(fetchEventsFromCalendar(
 						googleCalendar,
 						calendarEntry,
 						timeMin,
-						timeMax
+						timeMax,
+						calendarKeyMap
 				));
 			}
 		}
@@ -175,8 +194,14 @@ public class GoogleCalendarService {
 		return result;
 	}
 
-	public CalendarEvent createEvent(int calendarKey, String summary, String dateYmd, String timeHm)
-			throws IOException {
+	public CalendarEvent createEvent(
+			Integer calendarKey,
+			String summary,
+			String dateYmd,
+			String timeHm,
+			String endTimeHm,
+			Integer durationMinutes
+	) throws IOException {
 		if (summary == null || summary.isBlank()) {
 			throw new IllegalArgumentException("일정 제목을 입력하세요.");
 		}
@@ -184,10 +209,19 @@ public class GoogleCalendarService {
 		Credential credential = getValidCredential();
 		com.google.api.services.calendar.Calendar googleCalendar = buildGoogleCalendar(credential);
 		List<CalendarListEntry> calendars = listVisibleCalendars(googleCalendar);
-		CalendarListEntry calendarEntry = findCalendarByKey(calendars, calendarKey);
+		CalendarListEntry calendarEntry = resolveCalendarEntry(calendars, calendarKey);
 
 		if (calendarEntry == null) {
-			throw new IllegalArgumentException("캘린더 목록 키를 찾을 수 없습니다: " + calendarKey);
+			if (calendarKey == null) {
+				throw new IllegalArgumentException(
+						"기본 캘린더를 찾을 수 없습니다. gc c 로 캘린더 목록을 확인하거나 -c 로 지정하세요."
+				);
+			}
+
+			throw new IllegalArgumentException(
+					"캘린더를 찾을 수 없습니다: " + calendarKey + ". (이름이 \""
+							+ calendarKey + ".\" 로 시작하는지 gc c 로 확인하세요)"
+			);
 		}
 
 		LocalDate date = dateYmd == null || dateYmd.isBlank()
@@ -201,9 +235,9 @@ public class GoogleCalendarService {
 			event.setStart(new EventDateTime().setDate(new DateTime(startDate)));
 			event.setEnd(new EventDateTime().setDate(new DateTime(endDate)));
 		} else {
-			LocalTime time = parseLocalTime(timeHm);
-			ZonedDateTime start = ZonedDateTime.of(date, time, CALENDAR_ZONE);
-			ZonedDateTime end = start.plusHours(1);
+			LocalTime startTime = parseLocalTime(timeHm);
+			ZonedDateTime start = ZonedDateTime.of(date, startTime, CALENDAR_ZONE);
+			ZonedDateTime end = resolveEventEnd(start, endTimeHm, durationMinutes);
 			event.setStart(new EventDateTime()
 					.setDateTime(new DateTime(start.toInstant().toEpochMilli()))
 					.setTimeZone(CALENDAR_ZONE.getId()));
@@ -217,7 +251,7 @@ public class GoogleCalendarService {
 					.insert(calendarEntry.getId(), event)
 					.execute();
 
-			return toCalendarEvent(created, calendarEntry);
+			return toCalendarEvent(created, calendarEntry, buildCalendarKeyMap(calendars));
 		} catch (GoogleJsonResponseException exception) {
 			if (exception.getStatusCode() == 403) {
 				throw new IllegalStateException(CALENDAR_WRITE_SCOPE_MESSAGE);
@@ -225,6 +259,206 @@ public class GoogleCalendarService {
 
 			throw exception;
 		}
+	}
+
+	public CalendarEvent updateEvent(
+			String eventId,
+			int calendarKey,
+			String summary,
+			String description,
+			Integer newCalendarKey
+	) throws IOException {
+		if (eventId == null || eventId.isBlank()) {
+			throw new IllegalArgumentException("일정 ID를 입력하세요.");
+		}
+
+		boolean hasSummary = summary != null && !summary.isBlank();
+		boolean hasDescription = description != null;
+		boolean hasMove = newCalendarKey != null;
+
+		if (!hasSummary && !hasDescription && !hasMove) {
+			throw new IllegalArgumentException("수정할 항목(-t, -d, -c)을 하나 이상 지정하세요.");
+		}
+
+		Credential credential = getValidCredential();
+		com.google.api.services.calendar.Calendar googleCalendar = buildGoogleCalendar(credential);
+		List<CalendarListEntry> calendars = listVisibleCalendars(googleCalendar);
+		Map<String, Integer> calendarKeyMap = buildCalendarKeyMap(calendars);
+		CalendarListEntry sourceCalendar = findCalendarByKey(calendars, calendarKey);
+
+		if (sourceCalendar == null) {
+			throw new IllegalArgumentException(
+					"캘린더를 찾을 수 없습니다: " + calendarKey + ". (이름이 \""
+							+ calendarKey + ".\" 로 시작하는지 gc c 로 확인하세요)"
+			);
+		}
+
+		try {
+			if (hasMove) {
+				CalendarListEntry destinationCalendar = findCalendarByKey(calendars, newCalendarKey);
+
+				if (destinationCalendar == null) {
+					throw new IllegalArgumentException(
+							"캘린더를 찾을 수 없습니다: " + newCalendarKey + ". (이름이 \""
+									+ newCalendarKey + ".\" 로 시작하는지 gc c 로 확인하세요)"
+					);
+				}
+
+				Event moved = googleCalendar.events()
+						.move(sourceCalendar.getId(), eventId, destinationCalendar.getId())
+						.execute();
+				sourceCalendar = destinationCalendar;
+				eventId = moved.getId();
+			}
+
+			if (hasSummary || hasDescription) {
+				Event patch = new Event();
+
+				if (hasSummary) {
+					patch.setSummary(summary.trim());
+				}
+
+				if (hasDescription) {
+					patch.setDescription(description);
+				}
+
+				Event updated = googleCalendar.events()
+						.patch(sourceCalendar.getId(), eventId, patch)
+						.execute();
+
+				return toCalendarEvent(updated, sourceCalendar, calendarKeyMap);
+			}
+
+			Event current = googleCalendar.events()
+					.get(sourceCalendar.getId(), eventId)
+					.execute();
+
+			return toCalendarEvent(current, sourceCalendar, calendarKeyMap);
+		} catch (GoogleJsonResponseException exception) {
+			if (exception.getStatusCode() == 403) {
+				throw new IllegalStateException(CALENDAR_WRITE_SCOPE_MESSAGE);
+			}
+
+			if (exception.getStatusCode() == 404) {
+				throw new IllegalArgumentException("일정을 찾을 수 없습니다: " + eventId);
+			}
+
+			throw exception;
+		}
+	}
+
+	public void deleteEvent(String eventId, int calendarKey) throws IOException {
+		if (eventId == null || eventId.isBlank()) {
+			throw new IllegalArgumentException("일정 ID를 입력하세요.");
+		}
+
+		Credential credential = getValidCredential();
+		com.google.api.services.calendar.Calendar googleCalendar = buildGoogleCalendar(credential);
+		List<CalendarListEntry> calendars = listVisibleCalendars(googleCalendar);
+		CalendarListEntry calendarEntry = findCalendarByKey(calendars, calendarKey);
+
+		if (calendarEntry == null) {
+			throw new IllegalArgumentException(
+					"캘린더를 찾을 수 없습니다: " + calendarKey + ". (이름이 \""
+							+ calendarKey + ".\" 로 시작하는지 gc c 로 확인하세요)"
+			);
+		}
+
+		try {
+			googleCalendar.events()
+					.delete(calendarEntry.getId(), eventId)
+					.execute();
+		} catch (GoogleJsonResponseException exception) {
+			if (exception.getStatusCode() == 403) {
+				throw new IllegalStateException(CALENDAR_WRITE_SCOPE_MESSAGE);
+			}
+
+			if (exception.getStatusCode() == 404) {
+				throw new IllegalArgumentException("일정을 찾을 수 없습니다: " + eventId);
+			}
+
+			throw exception;
+		}
+	}
+
+	private CalendarListEntry resolveCalendarEntry(List<CalendarListEntry> calendars, Integer calendarKey) {
+		if (calendarKey != null) {
+			return findCalendarByKey(calendars, calendarKey);
+		}
+
+		return calendars.stream()
+				.filter(entry -> parseCalendarKey(entry.getSummary()) != null)
+				.min(Comparator.comparing(entry -> parseCalendarKey(entry.getSummary())))
+				.orElse(calendars.isEmpty() ? null : calendars.get(0));
+	}
+
+	private ZonedDateTime resolveEventEnd(
+			ZonedDateTime start,
+			String endTimeHm,
+			Integer durationMinutes
+	) {
+		if (endTimeHm != null && !endTimeHm.isBlank()) {
+			LocalTime endTime = parseLocalTime(endTimeHm);
+			ZonedDateTime end = ZonedDateTime.of(start.toLocalDate(), endTime, CALENDAR_ZONE);
+
+			if (!end.isAfter(start)) {
+				throw new IllegalArgumentException("종료 시간은 시작 시간보다 뒤여야 합니다.");
+			}
+
+			return end;
+		}
+
+		if (durationMinutes != null && durationMinutes > 0) {
+			return start.plusMinutes(durationMinutes);
+		}
+
+		return start.plusHours(1);
+	}
+
+	private Map<String, Integer> buildCalendarKeyMap(List<CalendarListEntry> calendars) {
+		Map<String, Integer> keyMap = new HashMap<>();
+
+		for (CalendarListEntry entry : calendars) {
+			Integer key = parseCalendarKey(entry.getSummary());
+
+			if (key != null) {
+				keyMap.put(entry.getId(), key);
+			}
+		}
+
+		return keyMap;
+	}
+
+	private Integer parseCalendarKey(String calendarName) {
+		if (calendarName == null || calendarName.isBlank()) {
+			return null;
+		}
+
+		Matcher matcher = CALENDAR_KEY_PATTERN.matcher(calendarName.trim());
+
+		if (!matcher.find()) {
+			return null;
+		}
+
+		return Integer.parseInt(matcher.group(1));
+	}
+
+	private CalendarListEntry findCalendarByKey(List<CalendarListEntry> calendars, int calendarKey) {
+		for (CalendarListEntry entry : calendars) {
+			String calendarName = entry.getSummary();
+
+			if (calendarName == null || calendarName.isBlank()) {
+				continue;
+			}
+
+			Integer key = parseCalendarKey(calendarName);
+
+			if (key != null && key == calendarKey) {
+				return entry;
+			}
+		}
+
+		return null;
 	}
 
 	private LocalDate parseLocalDate(String dateYmd) {
@@ -321,43 +555,12 @@ public class GoogleCalendarService {
 				|| normalized.contains("holidays in south korea");
 	}
 
-	private Integer parseCalendarKey(String calendarName) {
-		if (calendarName == null || calendarName.isBlank()) {
-			return null;
-		}
-
-		Matcher matcher = CALENDAR_KEY_PATTERN.matcher(calendarName.trim());
-
-		if (!matcher.find()) {
-			return null;
-		}
-
-		return Integer.parseInt(matcher.group(1));
-	}
-
-	private CalendarListEntry findCalendarByKey(List<CalendarListEntry> calendars, int calendarKey) {
-		for (CalendarListEntry entry : calendars) {
-			String calendarName = entry.getSummary();
-
-			if (calendarName == null || calendarName.isBlank()) {
-				continue;
-			}
-
-			Integer key = parseCalendarKey(calendarName);
-
-			if (key != null && key == calendarKey) {
-				return entry;
-			}
-		}
-
-		return null;
-	}
-
 	private List<CalendarEvent> fetchEventsFromCalendar(
 			com.google.api.services.calendar.Calendar googleCalendar,
 			CalendarListEntry calendarEntry,
 			Instant timeMin,
-			Instant timeMax
+			Instant timeMax,
+			Map<String, Integer> calendarKeyMap
 	) throws IOException {
 		String calendarId = calendarEntry.getId();
 		Events events = googleCalendar.events().list(calendarId)
@@ -375,7 +578,7 @@ public class GoogleCalendarService {
 		List<CalendarEvent> result = new ArrayList<>();
 
 		for (Event event : events.getItems()) {
-			result.add(toCalendarEvent(event, calendarEntry));
+			result.add(toCalendarEvent(event, calendarEntry, calendarKeyMap));
 		}
 
 		return result;
@@ -480,7 +683,11 @@ public class GoogleCalendarService {
 		}
 	}
 
-	private CalendarEvent toCalendarEvent(Event event, CalendarListEntry calendarEntry) {
+	private CalendarEvent toCalendarEvent(
+			Event event,
+			CalendarListEntry calendarEntry,
+			Map<String, Integer> calendarKeyMap
+	) {
 		EventDateTime start = event.getStart();
 		EventDateTime end = event.getEnd();
 		boolean allDay = start != null && start.getDate() != null;
@@ -491,6 +698,7 @@ public class GoogleCalendarService {
 
 		return new CalendarEvent(
 				event.getId(),
+				calendarKeyMap.get(calendarId),
 				calendarId,
 				calendarName == null || calendarName.isBlank() ? calendarId : calendarName,
 				calendarEntry.getBackgroundColor(),

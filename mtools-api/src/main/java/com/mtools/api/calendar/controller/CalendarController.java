@@ -4,12 +4,15 @@ import java.io.IOException;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -18,6 +21,7 @@ import org.springframework.web.server.ResponseStatusException;
 
 import com.mtools.api.calendar.config.GoogleOAuthProperties;
 import com.mtools.api.calendar.request.CreateCalendarEventRequest;
+import com.mtools.api.calendar.request.UpdateCalendarEventRequest;
 import com.mtools.api.calendar.service.CalendarConnectionStatus;
 import com.mtools.api.calendar.service.CalendarEvent;
 import com.mtools.api.calendar.service.CalendarListItem;
@@ -91,7 +95,9 @@ public class CalendarController {
 					request.calendarKey(),
 					request.summary(),
 					request.date(),
-					request.time()
+					request.time(),
+					request.endTime(),
+					request.durationMinutes()
 			);
 		} catch (IllegalArgumentException exception) {
 			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, exception.getMessage());
@@ -105,11 +111,57 @@ public class CalendarController {
 		}
 	}
 
+	@PatchMapping("/api/calendar/events/{eventId}")
+	public CalendarEvent updateEvent(
+			@PathVariable String eventId,
+			@RequestBody UpdateCalendarEventRequest request
+	) {
+		try {
+			return googleCalendarService.updateEvent(
+					eventId,
+					request.calendarKey(),
+					request.summary(),
+					request.description(),
+					request.newCalendarKey()
+			);
+		} catch (IllegalArgumentException exception) {
+			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, exception.getMessage());
+		} catch (IllegalStateException exception) {
+			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, exception.getMessage());
+		} catch (IOException exception) {
+			throw new ResponseStatusException(
+					HttpStatus.BAD_GATEWAY,
+					"Google Calendar 일정을 수정하지 못했습니다: " + exception.getMessage()
+			);
+		}
+	}
+
+	@DeleteMapping("/api/calendar/events/{eventId}")
+	public Map<String, String> deleteEvent(
+			@PathVariable String eventId,
+			@RequestParam int calendarKey
+	) {
+		try {
+			googleCalendarService.deleteEvent(eventId, calendarKey);
+			return Map.of("status", "ok");
+		} catch (IllegalArgumentException exception) {
+			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, exception.getMessage());
+		} catch (IllegalStateException exception) {
+			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, exception.getMessage());
+		} catch (IOException exception) {
+			throw new ResponseStatusException(
+					HttpStatus.BAD_GATEWAY,
+					"Google Calendar 일정을 삭제하지 못했습니다: " + exception.getMessage()
+			);
+		}
+	}
+
 	@GetMapping("/api/calendar/events")
 	public List<CalendarEvent> events(
 			@RequestParam(required = false) String timeMin,
 			@RequestParam(required = false) String timeMax,
-			@RequestParam(required = false) Integer calendarKey
+			@RequestParam(required = false) List<Integer> calendarKey,
+			@RequestParam(required = false) String calendarKeys
 	) {
 		try {
 			Instant min = timeMin == null || timeMin.isBlank()
@@ -118,8 +170,9 @@ public class CalendarController {
 			Instant max = timeMax == null || timeMax.isBlank()
 					? googleCalendarService.defaultTimeMax()
 					: Instant.parse(timeMax);
+			List<Integer> keys = parseCalendarKeys(calendarKey, calendarKeys);
 
-			return googleCalendarService.fetchEvents(min, max, calendarKey);
+			return googleCalendarService.fetchEvents(min, max, keys);
 		} catch (IllegalArgumentException exception) {
 			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, exception.getMessage());
 		} catch (IllegalStateException exception) {
@@ -130,6 +183,32 @@ public class CalendarController {
 					"Google Calendar 일정을 불러오지 못했습니다: " + exception.getMessage()
 			);
 		}
+	}
+
+	private List<Integer> parseCalendarKeys(List<Integer> calendarKey, String calendarKeys) {
+		if (calendarKeys != null && !calendarKeys.isBlank()) {
+			List<Integer> keys = new ArrayList<>();
+
+			for (String rawKey : calendarKeys.split(",")) {
+				String trimmed = rawKey.trim();
+
+				if (trimmed.isEmpty()) {
+					continue;
+				}
+
+				keys.add(Integer.parseInt(trimmed));
+			}
+
+			if (!keys.isEmpty()) {
+				return keys;
+			}
+		}
+
+		if (calendarKey != null && !calendarKey.isEmpty()) {
+			return calendarKey;
+		}
+
+		return null;
 	}
 
 	@DeleteMapping("/api/calendar/disconnect")

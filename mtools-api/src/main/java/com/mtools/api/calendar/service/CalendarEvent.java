@@ -2,6 +2,7 @@ package com.mtools.api.calendar.service;
 
 public record CalendarEvent(
 		String id,
+		Integer calendarKey,
 		String calendarId,
 		String calendarName,
 		String calendarBackgroundColor,

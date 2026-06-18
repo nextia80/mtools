@@ -556,6 +556,17 @@ const focusHomeTerminal = async () => {
   terminalViewRef.value?.focusInput()
 }
 
+const openDocsMenu = () => {
+  setActiveView('docs')
+
+  const date = openMdDate.value || mdFilesByDate.value[0]?.date || ''
+
+  if (date) {
+    openMdDate.value = date
+    selectFirstMdFileByDate(date)
+  }
+}
+
 const handleTerminalAction = (action: TerminalAction) => {
   if (action.type === 'open-md') {
     setActiveView('docs')
@@ -586,33 +597,75 @@ const handleTerminalAction = (action: TerminalAction) => {
 }
 
 const handleKeyboardShortcut = (event: KeyboardEvent) => {
-  if (event.metaKey && event.key.toLowerCase() === 'h') {
+  if (!event.metaKey || event.ctrlKey || event.altKey) {
+    return
+  }
+
+  const key = event.key
+
+  if (key === '1') {
     event.preventDefault()
     void focusHomeTerminal()
     return
   }
 
-  if (!event.metaKey || !selectedMdPath.value) {
+  if (key === '2') {
+    event.preventDefault()
+    setActiveView('board')
     return
   }
 
-  const key = event.key.toLowerCase()
+  if (key === '3') {
+    event.preventDefault()
+    setActiveView('member')
+    return
+  }
 
-  if (key === 'e') {
+  if (key === '4') {
+    event.preventDefault()
+    setActiveView('schedule')
+    return
+  }
+
+  if (key === '5') {
+    event.preventDefault()
+    setActiveView('swagger')
+    return
+  }
+
+  if (key === '6') {
+    event.preventDefault()
+    setActiveView('api')
+    return
+  }
+
+  if (key === '7') {
+    event.preventDefault()
+    openDocsMenu()
+    return
+  }
+
+  if (!selectedMdPath.value) {
+    return
+  }
+
+  const lowerKey = key.toLowerCase()
+
+  if (lowerKey === 'e') {
     event.preventDefault()
     activeView.value = 'docs'
     setMdViewMode('edit')
     return
   }
 
-  if (key === 's') {
+  if (lowerKey === 's') {
     event.preventDefault()
     activeView.value = 'docs'
     void saveMdFile()
     return
   }
 
-  if (key === 'v') {
+  if (lowerKey === 'v') {
     event.preventDefault()
     activeView.value = 'docs'
     setMdViewMode('review')

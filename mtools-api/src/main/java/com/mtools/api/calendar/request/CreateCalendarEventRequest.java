@@ -1,9 +1,11 @@
 package com.mtools.api.calendar.request;
 
 public record CreateCalendarEventRequest(
-		int calendarKey,
+		Integer calendarKey,
 		String summary,
 		String date,
-		String time
+		String time,
+		String endTime,
+		Integer durationMinutes
 ) {
 }

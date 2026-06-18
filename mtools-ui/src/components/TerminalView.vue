@@ -60,7 +60,7 @@ const focusInput = () => {
 }
 
 const canFillFromClick = (input: string) =>
-  /^(bd\s+(g|m|d)|md\s+g)\s*$/i.test(input.trimEnd())
+  /^(bd\s+(g|m|d)|md\s+g|gc\s+(m|r))\s*$/i.test(input.trimEnd())
 
 const handleLineClick = async (line: TerminalLine) => {
   if (!line.clickValue || isRunning.value) {
