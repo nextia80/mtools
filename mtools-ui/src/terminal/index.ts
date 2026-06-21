@@ -26,6 +26,20 @@ export const executeTerminalCommand = async (
       return { lines: [], clear: true }
     }
 
+    if (trimmed === '<') {
+      return {
+        lines: [{ type: 'output', text: '좌측 메뉴를 접었습니다.' }],
+        action: { type: 'sidebar-set-collapsed', collapsed: true },
+      }
+    }
+
+    if (trimmed === '>') {
+      return {
+        lines: [{ type: 'output', text: '좌측 메뉴를 펼쳤습니다.' }],
+        action: { type: 'sidebar-set-collapsed', collapsed: false },
+      }
+    }
+
     const group = trimmed.split(/\s+/)[0]?.toLowerCase() ?? ''
 
     if (group === 'bd') {

@@ -3,6 +3,7 @@ import type { ActiveView, MdFile, MdFileGroup } from '../types'
 
 defineProps<{
   activeView: ActiveView
+  collapsed: boolean
   mdFiles: MdFile[]
   mdFilesByDate: MdFileGroup[]
   openMdDate: string
@@ -13,6 +14,7 @@ defineProps<{
 
 defineEmits<{
   setActiveView: [view: ActiveView]
+  toggleCollapsed: []
   refreshMdFiles: []
   openDateGroup: [date: string]
   selectMdFile: [path: string]
@@ -25,10 +27,10 @@ const formatMdMenuFileName = (name: string) =>
 </script>
 
 <template>
-  <aside class="sidebar">
+  <aside class="sidebar" :class="{ collapsed }">
     <div class="brand">
       <span class="brand-mark">M</span>
-      <div>
+      <div class="brand-text">
         <strong>mtools</strong>
         <span>workspace</span>
       </div>
@@ -39,6 +41,7 @@ const formatMdMenuFileName = (name: string) =>
         class="primary-menu-item"
         :class="{ active: activeView === 'home' }"
         type="button"
+        title="터미널"
         @click="$emit('setActiveView', 'home')"
       >
         <span class="menu-icon">1</span>
@@ -48,6 +51,7 @@ const formatMdMenuFileName = (name: string) =>
         class="primary-menu-item"
         :class="{ active: activeView === 'board' }"
         type="button"
+        title="게시판"
         @click="$emit('setActiveView', 'board')"
       >
         <span class="menu-icon">2</span>
@@ -57,6 +61,7 @@ const formatMdMenuFileName = (name: string) =>
         class="primary-menu-item"
         :class="{ active: activeView === 'member' }"
         type="button"
+        title="회원관리"
         @click="$emit('setActiveView', 'member')"
       >
         <span class="menu-icon">3</span>
@@ -66,6 +71,7 @@ const formatMdMenuFileName = (name: string) =>
         class="primary-menu-item"
         :class="{ active: activeView === 'schedule' }"
         type="button"
+        title="일정관리"
         @click="$emit('setActiveView', 'schedule')"
       >
         <span class="menu-icon">4</span>
@@ -75,6 +81,7 @@ const formatMdMenuFileName = (name: string) =>
         class="primary-menu-item"
         :class="{ active: activeView === 'swagger' }"
         type="button"
+        title="API 스웨거"
         @click="$emit('setActiveView', 'swagger')"
       >
         <span class="menu-icon">5</span>
@@ -84,6 +91,7 @@ const formatMdMenuFileName = (name: string) =>
         class="primary-menu-item"
         :class="{ active: activeView === 'api' }"
         type="button"
+        title="API 테스트"
         @click="$emit('setActiveView', 'api')"
       >
         <span class="menu-icon">6</span>
@@ -94,6 +102,7 @@ const formatMdMenuFileName = (name: string) =>
           class="primary-menu-item docs-menu-button"
           :class="{ active: activeView === 'docs' }"
           type="button"
+          title="일자별LOG"
           @click="$emit('setActiveView', 'docs')"
         >
           <span class="menu-icon">7</span>
@@ -140,6 +149,15 @@ const formatMdMenuFileName = (name: string) =>
     <div class="sidebar-footer">
       <span class="status-dot">localhost:8080</span>
       <p>MD 목록은 1분마다 자동 갱신됩니다.</p>
+      <button
+        class="sidebar-toggle-button"
+        type="button"
+        :title="collapsed ? '메뉴 펼치기' : '메뉴 접기'"
+        :aria-label="collapsed ? '메뉴 펼치기' : '메뉴 접기'"
+        @click="$emit('toggleCollapsed')"
+      >
+        {{ collapsed ? '>>' : '<<' }}
+      </button>
     </div>
   </aside>
 </template>

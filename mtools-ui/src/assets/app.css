@@ -8,6 +8,10 @@
   color: #1f2937;
 }
 
+.app-shell.sidebar-collapsed {
+  grid-template-columns: 4.5rem minmax(0, 1fr);
+}
+
 .sidebar {
   position: sticky;
   top: 0;
@@ -19,6 +23,53 @@
   border-right: 1px solid #e2e8f0;
   background: #ffffff;
   box-shadow: 10px 0 30px rgba(15, 23, 42, 0.05);
+}
+
+.sidebar.collapsed {
+  align-items: center;
+  padding: 1rem 0.5rem;
+}
+
+.sidebar.collapsed .brand {
+  justify-content: center;
+  width: 100%;
+  padding-bottom: 1rem;
+}
+
+.sidebar.collapsed .brand-text,
+.sidebar.collapsed .primary-menu-item strong,
+.sidebar.collapsed .docs-inline-refresh,
+.sidebar.collapsed .nested-md-menu,
+.sidebar.collapsed .sidebar-footer .status-dot,
+.sidebar.collapsed .sidebar-footer p {
+  display: none;
+}
+
+.sidebar.collapsed .primary-menu-item {
+  grid-template-columns: 1fr;
+  justify-items: center;
+  width: 2.85rem;
+  padding: 0.35rem;
+}
+
+.sidebar.collapsed .docs-menu-row {
+  grid-template-columns: 1fr;
+  justify-items: center;
+}
+
+.sidebar.collapsed .docs-menu-button {
+  width: 2.85rem;
+}
+
+.sidebar.collapsed .menu-icon {
+  width: 1.85rem;
+  height: 1.85rem;
+  font-size: 0.72rem;
+}
+
+.sidebar.collapsed .sidebar-footer {
+  width: 100%;
+  justify-items: center;
 }
 
 .brand {
@@ -132,6 +183,11 @@
   border-color: #bbf7d0;
   background: #ecfdf5;
   color: #047857;
+}
+
+.primary-menu-item.active .menu-icon {
+  background: #42b883;
+  color: #ffffff;
 }
 
 .primary-menu-item strong,
@@ -375,6 +431,29 @@
   margin: 0;
   color: #64748b;
   font-size: 0.8rem;
+}
+
+.sidebar-toggle-button {
+  width: 100%;
+  padding: 0.45rem 0.75rem;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  background: #f8fafc;
+  color: #64748b;
+  font-size: 0.9rem;
+  font-weight: 900;
+  line-height: 1;
+}
+
+.sidebar-toggle-button:hover {
+  border-color: #cbd5e1;
+  background: #f1f5f9;
+  color: #334155;
+}
+
+.sidebar.collapsed .sidebar-toggle-button {
+  width: 2.85rem;
+  padding: 0.45rem 0;
 }
 
 .workspace {

@@ -16,6 +16,7 @@ const API_BASE_URL = 'http://localhost:8080'
 const SWAGGER_UI_URL = `${API_BASE_URL}/swagger-ui/index.html`
 
 const activeView = ref<ActiveView>('home')
+const sidebarCollapsed = ref(false)
 const terminalViewRef = ref<{ focusInput: () => void } | null>(null)
 const apiEndpoint = ref('/api/echo')
 const apiInput = ref('{\n  "id": "a"\n}')
@@ -567,7 +568,16 @@ const openDocsMenu = () => {
   }
 }
 
+const toggleSidebarCollapsed = () => {
+  sidebarCollapsed.value = !sidebarCollapsed.value
+}
+
 const handleTerminalAction = (action: TerminalAction) => {
+  if (action.type === 'sidebar-set-collapsed') {
+    sidebarCollapsed.value = action.collapsed
+    return
+  }
+
   if (action.type === 'open-md') {
     setActiveView('docs')
     void selectMdFile(action.path)
@@ -642,6 +652,18 @@ const handleKeyboardShortcut = (event: KeyboardEvent) => {
   if (key === '7') {
     event.preventDefault()
     openDocsMenu()
+    return
+  }
+
+  if (key === 'ArrowLeft') {
+    event.preventDefault()
+    sidebarCollapsed.value = true
+    return
+  }
+
+  if (key === 'ArrowRight') {
+    event.preventDefault()
+    sidebarCollapsed.value = false
     return
   }
 
@@ -735,9 +757,10 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <div class="app-shell">
+  <div class="app-shell" :class="{ 'sidebar-collapsed': sidebarCollapsed }">
     <SidebarMenu
       :active-view="activeView"
+      :collapsed="sidebarCollapsed"
       :md-files="mdFiles"
       :md-files-by-date="mdFilesByDate"
       :open-md-date="openMdDate"
@@ -745,6 +768,7 @@ onUnmounted(() => {
       :is-md-loading="isMdLoading"
       :md-error-message="mdErrorMessage"
       @set-active-view="setActiveView"
+      @toggle-collapsed="toggleSidebarCollapsed"
       @refresh-md-files="loadMdFiles"
       @open-date-group="openDateGroup"
       @select-md-file="selectMdFile"
