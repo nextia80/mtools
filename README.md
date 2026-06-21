@@ -49,6 +49,7 @@ cd mtools-ui && npm install && npm run dev
 | [INSTALL.md](./INSTALL.md) | 설치·실행 가이드 |
 | [mtools-ui/UI.md](./mtools-ui/UI.md) | UI·터미널·화면 구조 |
 | [mtools-api/API.md](./mtools-api/API.md) | API 엔드포인트 |
+| [MD/2026-06-19/2026-06-19_10-00_GitHub_push_명령어_정리.md](./MD/2026-06-19/2026-06-19_10-00_GitHub_push_명령어_정리.md) | GitHub push 명령어 |
 | `MD/` | 개발 일지 및 기능 정리 |
 
 ## 라이선스

@@ -28,28 +28,55 @@ const parseHttpError = (raw: string, status: number) => {
   return message
 }
 
+const FETCH_TIMEOUT_MS = 15000
+
+const fetchWithTimeout = (url: string, init?: RequestInit) => {
+  const controller = new AbortController()
+  const timeoutId = window.setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS)
+
+  return fetch(url, { ...init, signal: controller.signal }).finally(() => {
+    window.clearTimeout(timeoutId)
+  })
+}
+
 export const fetchJson = async <T>(url: string): Promise<T> => {
-  const response = await fetch(url)
+  try {
+    const response = await fetchWithTimeout(url)
 
-  if (!response.ok) {
-    const raw = await response.text()
-    throw new Error(parseHttpError(raw, response.status))
+    if (!response.ok) {
+      const raw = await response.text()
+      throw new Error(parseHttpError(raw, response.status))
+    }
+
+    return (await response.json()) as T
+  } catch (error) {
+    if (error instanceof DOMException && error.name === 'AbortError') {
+      throw new Error('요청 시간이 초과되었습니다. API 서버 상태를 확인하세요.')
+    }
+
+    throw error
   }
-
-  return (await response.json()) as T
 }
 
 export const requestJson = async <T>(url: string, method: string, body?: unknown): Promise<T> => {
-  const response = await fetch(url, {
-    method,
-    headers: body === undefined ? undefined : { 'Content-Type': 'application/json' },
-    body: body === undefined ? undefined : JSON.stringify(body),
-  })
+  try {
+    const response = await fetchWithTimeout(url, {
+      method,
+      headers: body === undefined ? undefined : { 'Content-Type': 'application/json' },
+      body: body === undefined ? undefined : JSON.stringify(body),
+    })
 
-  if (!response.ok) {
-    const raw = await response.text()
-    throw new Error(parseHttpError(raw, response.status))
+    if (!response.ok) {
+      const raw = await response.text()
+      throw new Error(parseHttpError(raw, response.status))
+    }
+
+    return (await response.json()) as T
+  } catch (error) {
+    if (error instanceof DOMException && error.name === 'AbortError') {
+      throw new Error('요청 시간이 초과되었습니다. API 서버 상태를 확인하세요.')
+    }
+
+    throw error
   }
-
-  return (await response.json()) as T
 }

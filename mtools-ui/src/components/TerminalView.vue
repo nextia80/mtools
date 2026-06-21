@@ -36,14 +36,14 @@ const assignLineIds = (drafts: TerminalLineDraft[]) =>
     return { ...draft, id: lineId }
   })
 
-const appendWelcomeLines = (drafts: TerminalLineDraft[]) => {
-  welcomeLines.value.push(...assignLineIds(drafts))
+const resetWelcomeLines = () => {
+  lineId = 0
+  welcomeLines.value = assignLineIds(terminalWelcomeLines())
 }
 
 const clearTerminal = () => {
-  welcomeLines.value = []
+  resetWelcomeLines()
   commandBlocks.value = []
-  lineId = 0
   blockId = 0
 }
 
@@ -162,13 +162,15 @@ watch(
   () => props.active,
   (active) => {
     if (active) {
+      void scrollToBottom()
       focusInput()
     }
   },
 )
 
 onMounted(() => {
-  appendWelcomeLines(terminalWelcomeLines())
+  isRunning.value = false
+  resetWelcomeLines()
   void scrollToBottom()
 
   if (props.active) {
@@ -181,16 +183,21 @@ defineExpose({ focusInput })
 
 <template>
   <section class="view-panel terminal-view">
-    <div class="terminal-panel" @click="focusInput">
-      <header class="terminal-header">
-        <h1>mTools 터미널</h1>
+    <div class="terminal-panel">
+      <header class="terminal-titlebar">
+        <div class="terminal-traffic-lights" aria-hidden="true">
+          <span class="terminal-light terminal-light-close" />
+          <span class="terminal-light terminal-light-minimize" />
+          <span class="terminal-light terminal-light-maximize" />
+        </div>
+        <span class="terminal-titlebar-label">-zsh</span>
       </header>
 
-      <div ref="outputRef" class="terminal-output" aria-live="polite">
+      <div ref="outputRef" class="terminal-output" aria-live="polite" @click="focusInput">
         <div
           v-for="line in welcomeLines"
           :key="line.id"
-          class="terminal-line terminal-line-output"
+          class="terminal-line terminal-line-output terminal-line-muted"
         >
           <pre class="terminal-text">{{ line.text }}</pre>
         </div>
@@ -201,59 +208,64 @@ defineExpose({ focusInput })
           class="terminal-command-group"
         >
           <div class="terminal-line terminal-line-input">
-            <span class="terminal-prompt">&gt;</span>
-            <pre class="terminal-text">{{ block.command }}</pre>
+            <span class="terminal-prompt" aria-hidden="true">
+              <span class="terminal-prompt-arrow">➜</span>
+            </span>
+            <pre class="terminal-text terminal-text-command">{{ block.command }}</pre>
           </div>
 
-          <div
+          <template
             v-if="block.results.length > 0 || (isRunning && blockIndex === commandBlocks.length - 1)"
-            class="terminal-result-box"
           >
-            <div
-              v-for="line in block.results"
-              :key="line.id"
-              class="terminal-line"
-              :class="[
-                `terminal-line-${line.type}`,
-                { 'terminal-line-group-break': line.groupBreak },
-              ]"
-            >
-              <button
-                v-if="line.clickValue && line.type === 'output'"
-                type="button"
-                class="terminal-text terminal-text-clickable"
-                :title="`${commandInput.trimEnd()} ${line.clickValue}`"
-                @click.stop="handleLineClick(line)"
+            <div class="terminal-command-results">
+              <div
+                v-for="line in block.results"
+                :key="line.id"
+                class="terminal-line terminal-line-result"
+                :class="[
+                  `terminal-line-${line.type}`,
+                  { 'terminal-line-group-break': line.groupBreak },
+                ]"
               >
-                {{ line.text }}
-              </button>
-              <pre v-else class="terminal-text">{{ line.text }}</pre>
+                <button
+                  v-if="line.clickValue && line.type === 'output'"
+                  type="button"
+                  class="terminal-text terminal-text-clickable"
+                  :title="`${commandInput.trimEnd()} ${line.clickValue}`"
+                  @click.stop="handleLineClick(line)"
+                >
+                  {{ line.text }}
+                </button>
+                <pre v-else class="terminal-text">{{ line.text }}</pre>
+              </div>
+
+              <p
+                v-if="isRunning && blockIndex === commandBlocks.length - 1"
+                class="terminal-running"
+              >
+                실행 중...
+              </p>
             </div>
-
-            <p
-              v-if="isRunning && blockIndex === commandBlocks.length - 1"
-              class="terminal-running"
-            >
-              실행 중...
-            </p>
-          </div>
+          </template>
         </div>
-      </div>
 
-      <form class="terminal-input-bar" @submit.prevent="runCommand">
-        <span class="terminal-prompt">&gt;</span>
-        <input
-          ref="inputRef"
-          v-model="commandInput"
-          class="terminal-input"
-          type="text"
-          spellcheck="false"
-          autocomplete="off"
-          placeholder="명령어를 입력하세요 (/?)"
-          :disabled="isRunning"
-          @keydown="handleInputKeydown"
-        />
-      </form>
+        <form class="terminal-line terminal-line-active" @submit.prevent="runCommand" @click.stop>
+          <span class="terminal-prompt" aria-hidden="true">
+            <span class="terminal-prompt-arrow">➜</span>
+          </span>
+          <input
+            ref="inputRef"
+            v-model="commandInput"
+            class="terminal-input"
+            type="text"
+            spellcheck="false"
+            autocomplete="off"
+            aria-label="터미널 명령어 입력"
+            :disabled="isRunning"
+            @keydown="handleInputKeydown"
+          />
+        </form>
+      </div>
     </div>
   </section>
 </template>

@@ -621,37 +621,37 @@ const handleKeyboardShortcut = (event: KeyboardEvent) => {
 
   if (key === '2') {
     event.preventDefault()
-    setActiveView('board')
+    openDocsMenu()
     return
   }
 
   if (key === '3') {
     event.preventDefault()
-    setActiveView('member')
+    setActiveView('schedule')
     return
   }
 
   if (key === '4') {
     event.preventDefault()
-    setActiveView('schedule')
+    setActiveView('board')
     return
   }
 
   if (key === '5') {
     event.preventDefault()
-    setActiveView('swagger')
+    setActiveView('member')
     return
   }
 
   if (key === '6') {
     event.preventDefault()
-    setActiveView('api')
+    setActiveView('swagger')
     return
   }
 
   if (key === '7') {
     event.preventDefault()
-    openDocsMenu()
+    setActiveView('api')
     return
   }
 

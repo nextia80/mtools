@@ -294,7 +294,8 @@ cd mtools-api
 
 - UI·터미널·화면: [mtools-ui/UI.md](./mtools-ui/UI.md)
 - API 명세: [mtools-api/API.md](./mtools-api/API.md)
+- GitHub push: [MD/2026-06-19/2026-06-19_10-00_GitHub_push_명령어_정리.md](./MD/2026-06-19/2026-06-19_10-00_GitHub_push_명령어_정리.md)
+- PAT·최초 업로드: [MD/2026-06-17/2026-06-17_08-30_GitHub_업로드_및_토큰_가이드.md](./MD/2026-06-17/2026-06-17_08-30_GitHub_업로드_및_토큰_가이드.md)
 - 기능 상세: `MD/` 폴더의 개발 일지
-- GitHub push: `MD/2026-06-17/` GitHub 업로드 가이드 참고
 
 문제가 있으면 GitHub Issues에 남겨 주세요.
