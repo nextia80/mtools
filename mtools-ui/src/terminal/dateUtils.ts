@@ -94,3 +94,84 @@ export const buildWeekRangeFromToday = () => {
 
   return buildDateRange(today, endYmd)
 }
+
+export const parseYear = (raw: string) => {
+  if (!/^\d{4}$/.test(raw)) {
+    return null
+  }
+
+  const year = Number(raw)
+
+  if (!Number.isInteger(year) || year < 1 || year > 9999) {
+    return null
+  }
+
+  return { year }
+}
+
+export const parseYm = (raw: string) => {
+  const match = raw.match(/^(\d{4})(\d{2})$/)
+
+  if (!match?.[1] || !match[2]) {
+    return null
+  }
+
+  const year = Number(match[1])
+  const month = Number(match[2])
+  const date = new Date(year, month - 1, 1)
+
+  if (
+    !Number.isInteger(year) ||
+    !Number.isInteger(month) ||
+    month < 1 ||
+    month > 12 ||
+    date.getFullYear() !== year ||
+    date.getMonth() !== month - 1
+  ) {
+    return null
+  }
+
+  return { year, month }
+}
+
+export const buildYearRange = (fromYear: string, toYear: string) => {
+  const fromParsed = parseYear(fromYear)
+  const toParsed = parseYear(toYear)
+
+  if (!fromParsed || !toParsed) {
+    return null
+  }
+
+  if (fromParsed.year > toParsed.year) {
+    return { invalidOrder: true as const }
+  }
+
+  const start = new Date(fromParsed.year, 0, 1)
+  const end = new Date(toParsed.year + 1, 0, 1)
+
+  return {
+    timeMin: start.toISOString(),
+    timeMax: end.toISOString(),
+  }
+}
+
+export const buildMonthRange = (fromYm: string, toYm: string) => {
+  const fromParsed = parseYm(fromYm)
+  const toParsed = parseYm(toYm)
+
+  if (!fromParsed || !toParsed) {
+    return null
+  }
+
+  const start = new Date(fromParsed.year, fromParsed.month - 1, 1)
+  const end = new Date(toParsed.year, toParsed.month, 1)
+
+  if (start.getTime() >= end.getTime()) {
+    return { invalidOrder: true as const }
+  }
+
+  return {
+    timeMin: start.toISOString(),
+    timeMax: end.toISOString(),
+  }
+}

@@ -5,14 +5,15 @@ import type {
   TerminalLineDraft,
 } from '../../types'
 import { fetchJson, requestJson } from '../apiClient'
-import { buildDateRange, buildDayRange, buildWeekRangeFromToday, getTodayYmd, parseYmd } from '../dateUtils'
+import { buildDateRange, buildDayRange, buildMonthRange, buildWeekRangeFromToday, buildYearRange, getTodayYmd, parseYmd } from '../dateUtils'
+import { matchLike } from '../textUtils'
 import type { TerminalCommandResult } from '../types'
 
 const CALENDAR_LIST_KEY_WIDTH = 8
 const EVENT_REF_WIDTH = 12
 
 const GC_USAGE =
-  '사용법: gc l [YYYYMMDD|YYYYMMDD~YYYYMMDD] [-c n[,n]] | gc a "<내용>" [날짜] [시간] [-c n] | gc m <캘린더-MMDD-순번> [-t "<제목>"] [-d "<메모>"] [-c n] | gc r <캘린더-MMDD-순번> | gc c'
+  '사용법: gc l [YYYYMMDD|YYYYMMDD~YYYYMMDD|--y 기간] [-c n[,n]] [-k "키워드"] | gc a "<내용>" [날짜] [시간] [-c n] | gc m <캘린더-MMDD-순번> [-t "<제목>"] [-d "<메모>"] [-c n] | gc r <캘린더-MMDD-순번> | gc c'
 
 const EVENT_REF_PATTERN = /^(\d+)-(\d{4})-(\d+)$/
 
@@ -96,6 +97,14 @@ const computeEndHm = (startHm: string, durationMinutes: number) => {
   return `${String(endHour).padStart(2, '0')}${String(endMinute).padStart(2, '0')}`
 }
 
+type ParsedListFlags = {
+  keys?: number[]
+  keyword?: string
+  periodToken?: string
+  rest: string
+  error?: string
+}
+
 const extractCalendarFlag = (input: string): ParsedCalendarFlag => {
   const match = input.match(/(?:^|\s)-c\s+(\d+(?:\s*,\s*\d+)*)/i)
 
@@ -107,6 +116,71 @@ const extractCalendarFlag = (input: string): ParsedCalendarFlag => {
   const rest = input.replace(match[0], ' ').replace(/\s+/g, ' ').trim()
 
   return { keys, rest }
+}
+
+const extractListFlags = (input: string): ParsedListFlags => {
+  let rest = input.trim()
+  let keys: number[] | undefined
+  let keyword: string | undefined
+  let periodToken: string | undefined
+
+  while (true) {
+    const calendarMatch = rest.match(/(?:^|\s)-c\s+(\d+(?:\s*,\s*\d+)*)/i)
+
+    if (calendarMatch?.[1]) {
+      keys = calendarMatch[1].split(',').map((key) => Number(key.trim()))
+      rest = rest.replace(calendarMatch[0], ' ').replace(/\s+/g, ' ').trim()
+      continue
+    }
+
+    const keywordFlagMatch = rest.match(/(?:^|\s)-k\s+/i)
+
+    if (keywordFlagMatch?.index !== undefined) {
+      const valueStart = keywordFlagMatch.index + keywordFlagMatch[0].length
+      const quoted = consumeQuotedString(rest.slice(valueStart))
+
+      if ('error' in quoted) {
+        return { rest, error: '검색 키워드를 따옴표("")로 감싸세요.' }
+      }
+
+      keyword = quoted.value
+      rest = `${rest.slice(0, keywordFlagMatch.index)} ${quoted.rest}`.replace(/\s+/g, ' ').trim()
+      continue
+    }
+
+    const periodFlagMatch = rest.match(/(?:^|\s)--y\s+(\S+)/i)
+
+    if (periodFlagMatch?.[1]) {
+      if (periodToken) {
+        return { rest, error: '--y는 한 번만 지정할 수 있습니다.' }
+      }
+
+      periodToken = periodFlagMatch[1]
+      rest = rest.replace(periodFlagMatch[0], ' ').replace(/\s+/g, ' ').trim()
+      continue
+    }
+
+    break
+  }
+
+  return { keys, keyword, periodToken, rest }
+}
+
+const eventMatchesKeyword = (event: CalendarEvent, keyword: string) => {
+  const pattern = keyword.trim().toLowerCase()
+
+  if (!pattern) {
+    return true
+  }
+
+  const fields = [
+    event.summary,
+    event.description ?? '',
+    event.calendarName,
+    event.location ?? '',
+  ]
+
+  return fields.some((field) => matchLike(field.toLowerCase(), pattern))
 }
 
 const parseTodayDateArg = (): ParsedDateArg => {
@@ -161,6 +235,79 @@ const parseListDateArg = (token?: string): ParsedDateArg => {
   }
 
   return { timeMin: range.timeMin, timeMax: range.timeMax }
+}
+
+const parseYearRangeToken = (token: string): ParsedDateArg => {
+  const [fromYear = '', toYear = fromYear] = token.split('~')
+
+  if (!/^\d{4}$/.test(fromYear) || !/^\d{4}$/.test(toYear)) {
+    return { error: '년도는 YYYY 또는 YYYY~YYYY 형식이어야 합니다. 예: --y 2026' }
+  }
+
+  const range = buildYearRange(fromYear, toYear)
+
+  if (!range) {
+    return { error: '년도는 YYYY 또는 YYYY~YYYY 형식이어야 합니다. 예: --y 2026' }
+  }
+
+  if ('invalidOrder' in range) {
+    return { error: '년도 범위는 시작 년도 ≤ 끝 년도여야 합니다.' }
+  }
+
+  return { timeMin: range.timeMin, timeMax: range.timeMax }
+}
+
+const parseMonthRangeToken = (token: string): ParsedDateArg => {
+  const [fromYm = '', toYm = fromYm] = token.split('~')
+
+  if (!/^\d{6}$/.test(fromYm) || !/^\d{6}$/.test(toYm)) {
+    return { error: '년월은 YYYYMM 또는 YYYYMM~YYYYMM 형식이어야 합니다. 예: --y 202606' }
+  }
+
+  const range = buildMonthRange(fromYm, toYm)
+
+  if (!range) {
+    return { error: '년월은 YYYYMM 또는 YYYYMM~YYYYMM 형식이어야 합니다. 예: --y 202606' }
+  }
+
+  if ('invalidOrder' in range) {
+    return { error: '년월 범위는 시작 ≤ 끝 이어야 합니다.' }
+  }
+
+  return { timeMin: range.timeMin, timeMax: range.timeMax }
+}
+
+const parsePeriodRangeToken = (token: string): ParsedDateArg => {
+  const [from = '', to = from] = token.split('~')
+  const isYearRange = /^\d{4}$/.test(from) && /^\d{4}$/.test(to)
+  const isMonthRange = /^\d{6}$/.test(from) && /^\d{6}$/.test(to)
+
+  if (isYearRange) {
+    return parseYearRangeToken(token)
+  }
+
+  if (isMonthRange) {
+    return parseMonthRangeToken(token)
+  }
+
+  return {
+    error: '기간은 YYYY, YYYY~YYYY, YYYYMM, YYYYMM~YYYYMM 형식이어야 합니다. 예: --y 2026',
+  }
+}
+
+const resolveListDateArg = (
+  dateToken: string,
+  periodToken?: string,
+): ParsedDateArg => {
+  if (periodToken && dateToken) {
+    return { error: '날짜는 YYYYMMDD, --y 기간 중 하나만 지정하세요.' }
+  }
+
+  if (periodToken) {
+    return parsePeriodRangeToken(periodToken)
+  }
+
+  return parseListDateArg(dateToken || undefined)
 }
 
 const parseTimeArg = (token?: string): ParsedTimeArg => {
@@ -282,6 +429,20 @@ const getEventMmdd = (event: CalendarEvent) => {
   return `${ymd.slice(5, 7)}${ymd.slice(8, 10)}`
 }
 
+const compareEventsWithinGroup = (eventA: CalendarEvent, eventB: CalendarEvent) => {
+  if (eventA.allDay !== eventB.allDay) {
+    return eventA.allDay ? -1 : 1
+  }
+
+  const startCompare = eventA.start.localeCompare(eventB.start)
+
+  if (startCompare !== 0) {
+    return startCompare
+  }
+
+  return eventA.summary.localeCompare(eventB.summary)
+}
+
 const compareEventsForRef = (eventA: CalendarEvent, eventB: CalendarEvent) => {
   const calendarKeyA = resolveEventCalendarKey(eventA) ?? 0
   const calendarKeyB = resolveEventCalendarKey(eventB) ?? 0
@@ -296,18 +457,28 @@ const compareEventsForRef = (eventA: CalendarEvent, eventB: CalendarEvent) => {
     return dateCompare
   }
 
-  if (eventA.allDay !== eventB.allDay) {
-    return eventA.allDay ? -1 : 1
-  }
-
-  const startCompare = eventA.start.localeCompare(eventB.start)
-
-  if (startCompare !== 0) {
-    return startCompare
-  }
-
-  return eventA.summary.localeCompare(eventB.summary)
+  return compareEventsWithinGroup(eventA, eventB)
 }
+
+const compareEventsForDisplay = (eventA: CalendarEvent, eventB: CalendarEvent) => {
+  const dateCompare = getEventDateYmd(eventA).localeCompare(getEventDateYmd(eventB))
+
+  if (dateCompare !== 0) {
+    return dateCompare
+  }
+
+  const calendarKeyA = resolveEventCalendarKey(eventA) ?? 0
+  const calendarKeyB = resolveEventCalendarKey(eventB) ?? 0
+
+  if (calendarKeyA !== calendarKeyB) {
+    return calendarKeyA - calendarKeyB
+  }
+
+  return compareEventsWithinGroup(eventA, eventB)
+}
+
+const resolveCalendarTextColor = (event: CalendarEvent) =>
+  event.calendarBackgroundColor ?? event.calendarForegroundColor ?? undefined
 
 const assignEventRefs = (events: CalendarEvent[]): EventWithRef[] => {
   const sorted = [...events].sort(compareEventsForRef)
@@ -348,34 +519,50 @@ const buildYmdFromMmdd = (mmdd: string) => {
   return `${year}${mmdd}`
 }
 
-const formatCalendarEvents = (events: CalendarEvent[]): TerminalLineDraft[] => {
-  if (events.length === 0) {
+const formatCalendarEvents = (events: CalendarEvent[], keyword?: string): TerminalLineDraft[] => {
+  const eventsWithRef = assignEventRefs(events)
+  const filteredEvents = keyword
+    ? eventsWithRef.filter((event) => eventMatchesKeyword(event, keyword))
+    : eventsWithRef
+
+  if (filteredEvents.length === 0) {
     lastListedEvents = []
+
+    if (keyword?.trim()) {
+      return [{ type: 'output', text: `'${keyword.trim()}' 키워드와 일치하는 일정이 없습니다.` }]
+    }
+
     return [{ type: 'output', text: '일정이 없습니다.' }]
   }
 
-  const eventsWithRef = assignEventRefs(events)
-
-  lastListedEvents = eventsWithRef.map((event) => ({
+  lastListedEvents = filteredEvents.map((event) => ({
     ref: event.ref,
     id: event.id,
     calendarKey: resolveEventCalendarKey(event) ?? 0,
   }))
 
+  const displayEvents = [...filteredEvents].sort(compareEventsForDisplay)
   const lines: TerminalLineDraft[] = []
   let previousDate = ''
 
-  for (const event of eventsWithRef) {
+  for (const event of displayEvents) {
     const date = getEventDateYmd(event)
     const groupBreak = previousDate !== '' && date !== previousDate
     const timeLabel = event.allDay ? '종일' : event.start.slice(11, 16)
     const refLabel = `[${event.ref}]`.padEnd(EVENT_REF_WIDTH)
+    const prefix = `${refLabel}${date} ${timeLabel} | `
+    const calendarColor = resolveCalendarTextColor(event)
 
     previousDate = date
 
     lines.push({
       type: 'output',
-      text: `${refLabel}${date} ${timeLabel} | ${event.calendarName} | ${event.summary}`,
+      text: `${prefix}${event.calendarName} | ${event.summary}`,
+      textParts: [
+        { text: prefix },
+        { text: event.calendarName, color: calendarColor },
+        { text: ` | ${event.summary}` },
+      ],
       clickValue: event.ref,
       groupBreak,
     })
@@ -453,6 +640,7 @@ const fetchGcEvents = async (
   timeMin?: string,
   timeMax?: string,
   calendarKeys?: number[],
+  keyword?: string,
 ): Promise<TerminalLineDraft[]> => {
   const connectionError = await ensureCalendarConnected(apiBaseUrl)
 
@@ -472,14 +660,14 @@ const fetchGcEvents = async (
 
     const events = eventGroups.flat()
 
-    return formatCalendarEvents(events)
+    return formatCalendarEvents(events, keyword)
   }
 
   const query = buildEventsQuery(timeMin, timeMax, calendarKeys?.[0])
   const url = `${apiBaseUrl}/api/calendar/events${query ? `?${query}` : ''}`
   const events = await fetchJson<CalendarEvent[]>(url)
 
-  return formatCalendarEvents(events)
+  return formatCalendarEvents(events, keyword)
 }
 
 const resolveDefaultCalendarKey = async (apiBaseUrl: string): Promise<number> => {
@@ -693,16 +881,20 @@ const modifyGcEvent = async (
 }
 
 const handleListCommand = async (apiBaseUrl: string, rest: string): Promise<TerminalCommandResult> => {
-  const { keys, rest: datePart } = extractCalendarFlag(rest)
-  const dateToken = datePart.trim()
-  const parsedDate = parseListDateArg(dateToken || undefined)
+  const { keys, keyword, periodToken, rest: datePart, error } = extractListFlags(rest)
+
+  if (error) {
+    return errorLines(error)
+  }
+
+  const parsedDate = resolveListDateArg(datePart.trim(), periodToken)
 
   if (parsedDate.error) {
     return errorLines(parsedDate.error)
   }
 
   return {
-    lines: await fetchGcEvents(apiBaseUrl, parsedDate.timeMin, parsedDate.timeMax, keys),
+    lines: await fetchGcEvents(apiBaseUrl, parsedDate.timeMin, parsedDate.timeMax, keys, keyword),
   }
 }
 

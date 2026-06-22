@@ -47,3 +47,12 @@ CREATE TABLE IF NOT EXISTS t_google_oauth (
 	st_email VARCHAR(1000),
 	dt_updated TIMESTAMP
 );
+
+CREATE TABLE IF NOT EXISTS t_google_gmail_oauth (
+	id_oauth NUMERIC(10) PRIMARY KEY DEFAULT 1,
+	st_access_token TEXT,
+	st_refresh_token TEXT,
+	dt_expires_at TIMESTAMP,
+	st_email VARCHAR(1000),
+	dt_updated TIMESTAMP
+);

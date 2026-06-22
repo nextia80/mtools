@@ -4,13 +4,15 @@ import { computed, nextTick, onMounted, onUnmounted, ref } from 'vue'
 import ApiTestView from './components/ApiTestView.vue'
 import BoardView from './components/BoardView.vue'
 import DocsView from './components/DocsView.vue'
+import MailDetailView from './components/MailDetailView.vue'
+import MailView from './components/MailView.vue'
 import MemberView from './components/MemberView.vue'
 import ScheduleView from './components/ScheduleView.vue'
 import SidebarMenu from './components/SidebarMenu.vue'
 import SwaggerView from './components/SwaggerView.vue'
 import TerminalView from './components/TerminalView.vue'
 import type { TerminalAction } from './terminal'
-import type { ActiveView, BoardPost, CalendarConnectionStatus, CalendarEvent, MdFile, MdViewMode } from './types'
+import type { ActiveView, BoardPost, CalendarConnectionStatus, CalendarEvent, MailConnectionStatus, MailMessage, MailMessageDetail, MailMessagesPage, MdFile, MdViewMode } from './types'
 
 const API_BASE_URL = 'http://localhost:8080'
 const SWAGGER_UI_URL = `${API_BASE_URL}/swagger-ui/index.html`
@@ -50,6 +52,27 @@ const calendarSaveMessage = ref('')
 const isCalendarLoading = ref(false)
 const isCalendarConnecting = ref(false)
 const isCalendarDisconnecting = ref(false)
+const mailConnected = ref(false)
+const mailEmail = ref<string | null>(null)
+const mailMessages = ref<MailMessage[]>([])
+const mailUnreadOnly = ref(true)
+const mailPageIndex = ref(1)
+const mailPageTokens = ref<(string | null)[]>([null])
+const mailPageSize = ref(10)
+const mailTotalCount = ref(0)
+const mailUnreadCount = ref(0)
+const mailInboxTotalCount = ref(0)
+const mailHasNext = ref(false)
+const mailViewMode = ref<'list' | 'detail'>('list')
+const mailDetail = ref<MailMessageDetail | null>(null)
+const selectedMailIndex = ref(-1)
+const isMailDetailLoading = ref(false)
+const isMailDeleting = ref(false)
+const mailErrorMessage = ref('')
+const mailSaveMessage = ref('')
+const isMailLoading = ref(false)
+const isMailConnecting = ref(false)
+const isMailDisconnecting = ref(false)
 let mdListTimer: number | undefined
 
 const getMdFileDate = (file: MdFile) => {
@@ -123,6 +146,10 @@ const setActiveView = (view: ActiveView) => {
 
   if (view === 'schedule') {
     void loadCalendarData()
+  }
+
+  if (view === 'mail') {
+    void loadMailData()
   }
 }
 
@@ -436,6 +463,329 @@ const handleCalendarCallbackParams = () => {
   void loadCalendarData()
 }
 
+const loadMailStatus = async () => {
+  const response = await fetch(`${API_BASE_URL}/api/mail/status`)
+
+  if (!response.ok) {
+    throw new Error(`연결 상태 조회 실패: ${response.status}`)
+  }
+
+  const status = (await response.json()) as MailConnectionStatus
+  mailConnected.value = status.connected
+  mailEmail.value = status.email
+}
+
+const resetMailPagination = () => {
+  mailPageIndex.value = 1
+  mailPageTokens.value = [null]
+}
+
+const loadMailMessages = async (targetPage = mailPageIndex.value) => {
+  const pageToken = mailPageTokens.value[targetPage - 1] ?? null
+  const params = new URLSearchParams({
+    maxResults: '10',
+    unreadOnly: String(mailUnreadOnly.value),
+  })
+
+  if (pageToken) {
+    params.set('pageToken', pageToken)
+  }
+
+  const response = await fetch(`${API_BASE_URL}/api/mail/messages?${params.toString()}`)
+
+  if (!response.ok) {
+    const message = await response.text()
+    throw new Error(message || `메일 조회 실패: ${response.status}`)
+  }
+
+  const page = (await response.json()) as MailMessagesPage
+
+  mailMessages.value = page.messages
+  mailPageSize.value = page.pageSize
+  mailTotalCount.value = page.totalCount
+  mailUnreadCount.value = page.unreadCount
+  mailInboxTotalCount.value = page.inboxTotalCount
+  mailHasNext.value = page.hasNext
+  mailPageIndex.value = targetPage
+
+  if (page.hasNext && page.nextPageToken) {
+    const tokens = [...mailPageTokens.value]
+
+    tokens[targetPage] = page.nextPageToken
+    mailPageTokens.value = tokens
+  }
+}
+
+const setMailUnreadOnly = (unreadOnly: boolean) => {
+  mailUnreadOnly.value = unreadOnly
+  resetMailPagination()
+  closeMailDetail()
+  void loadMailData()
+}
+
+const goMailNextPage = () => {
+  if (!mailHasNext.value || isMailLoading.value) {
+    return
+  }
+
+  void loadMailData(mailPageIndex.value + 1)
+}
+
+const goMailPrevPage = () => {
+  if (mailPageIndex.value <= 1 || isMailLoading.value) {
+    return
+  }
+
+  void loadMailData(mailPageIndex.value - 1)
+}
+
+const loadMailData = async (targetPage = mailPageIndex.value) => {
+  mailErrorMessage.value = ''
+  isMailLoading.value = true
+
+  try {
+    await loadMailStatus()
+
+    if (mailConnected.value) {
+      await loadMailMessages(targetPage)
+    } else {
+      mailMessages.value = []
+      resetMailPagination()
+      mailTotalCount.value = 0
+      mailUnreadCount.value = 0
+      mailInboxTotalCount.value = 0
+      mailHasNext.value = false
+    }
+  } catch (error) {
+    mailErrorMessage.value =
+      error instanceof Error ? error.message : '메일 정보를 불러오지 못했습니다.'
+  } finally {
+    isMailLoading.value = false
+  }
+}
+
+const refreshMailData = () => {
+  resetMailPagination()
+  closeMailDetail()
+  void loadMailData(1)
+}
+
+const markMailMessageAsRead = (messageId: string) => {
+  const target = mailMessages.value.find((message) => message.id === messageId)
+
+  if (!target || !target.unread) {
+    return
+  }
+
+  target.unread = false
+  mailUnreadCount.value = Math.max(0, mailUnreadCount.value - 1)
+
+  if (mailUnreadOnly.value) {
+    mailTotalCount.value = Math.max(0, mailTotalCount.value - 1)
+  }
+}
+
+const loadMailDetail = async (messageId: string) => {
+  isMailDetailLoading.value = true
+  mailErrorMessage.value = ''
+
+  try {
+    const response = await fetch(`${API_BASE_URL}/api/mail/messages/${messageId}`)
+
+    if (!response.ok) {
+      const message = await response.text()
+      throw new Error(message || `메일 상세 조회 실패: ${response.status}`)
+    }
+
+    mailDetail.value = (await response.json()) as MailMessageDetail
+    markMailMessageAsRead(messageId)
+  } catch (error) {
+    mailErrorMessage.value =
+      error instanceof Error ? error.message : '메일 상세를 불러오지 못했습니다.'
+  } finally {
+    isMailDetailLoading.value = false
+  }
+}
+
+const openMailDetail = (message: MailMessage, index: number) => {
+  mailViewMode.value = 'detail'
+  selectedMailIndex.value = index
+  mailSaveMessage.value = ''
+  mailErrorMessage.value = ''
+  void loadMailDetail(message.id)
+}
+
+const closeMailDetail = () => {
+  mailViewMode.value = 'list'
+  selectedMailIndex.value = -1
+  mailDetail.value = null
+  isMailDetailLoading.value = false
+  isMailDeleting.value = false
+}
+
+const goMailDetailPrev = () => {
+  if (selectedMailIndex.value <= 0 || isMailDetailLoading.value || isMailDeleting.value) {
+    return
+  }
+
+  const prevIndex = selectedMailIndex.value - 1
+  const message = mailMessages.value[prevIndex]
+
+  if (message) {
+    openMailDetail(message, prevIndex)
+  }
+}
+
+const goMailDetailNext = () => {
+  if (
+    selectedMailIndex.value < 0
+    || selectedMailIndex.value >= mailMessages.value.length - 1
+    || isMailDetailLoading.value
+    || isMailDeleting.value
+  ) {
+    return
+  }
+
+  const nextIndex = selectedMailIndex.value + 1
+  const message = mailMessages.value[nextIndex]
+
+  if (message) {
+    openMailDetail(message, nextIndex)
+  }
+}
+
+const deleteMailDetail = async () => {
+  const messageId = mailDetail.value?.id
+
+  if (!messageId || isMailDeleting.value) {
+    return
+  }
+
+  if (!window.confirm('이 메일을 휴지통으로 이동할까요?')) {
+    return
+  }
+
+  isMailDeleting.value = true
+  mailErrorMessage.value = ''
+  mailSaveMessage.value = ''
+
+  try {
+    const response = await fetch(`${API_BASE_URL}/api/mail/messages/${messageId}`, {
+      method: 'DELETE',
+    })
+
+    if (!response.ok) {
+      const message = await response.text()
+      throw new Error(message || `메일 삭제 실패: ${response.status}`)
+    }
+
+    const deletedIndex = selectedMailIndex.value
+    mailMessages.value = mailMessages.value.filter((message) => message.id !== messageId)
+    mailSaveMessage.value = '메일을 휴지통으로 이동했습니다.'
+
+    if (mailMessages.value.length === 0) {
+      closeMailDetail()
+      await loadMailData(mailPageIndex.value)
+      return
+    }
+
+    const nextIndex = Math.min(deletedIndex, mailMessages.value.length - 1)
+    const nextMessage = mailMessages.value[nextIndex]
+
+    if (nextMessage) {
+      openMailDetail(nextMessage, nextIndex)
+    } else {
+      closeMailDetail()
+    }
+  } catch (error) {
+    mailErrorMessage.value =
+      error instanceof Error ? error.message : '메일을 삭제하지 못했습니다.'
+  } finally {
+    isMailDeleting.value = false
+  }
+}
+
+const connectGmail = async () => {
+  mailErrorMessage.value = ''
+  mailSaveMessage.value = ''
+  isMailConnecting.value = true
+
+  try {
+    const response = await fetch(`${API_BASE_URL}/api/mail/auth-url`)
+
+    if (!response.ok) {
+      const message = await response.text()
+      throw new Error(message || `연결 URL 생성 실패: ${response.status}`)
+    }
+
+    const data = (await response.json()) as { authUrl: string }
+    window.location.href = data.authUrl
+  } catch (error) {
+    mailErrorMessage.value =
+      error instanceof Error ? error.message : 'Gmail 연결을 시작하지 못했습니다.'
+    isMailConnecting.value = false
+  }
+}
+
+const disconnectGmail = async () => {
+  if (!window.confirm('Gmail 연결을 해제할까요?')) {
+    return
+  }
+
+  mailErrorMessage.value = ''
+  mailSaveMessage.value = ''
+  isMailDisconnecting.value = true
+
+  try {
+    const response = await fetch(`${API_BASE_URL}/api/mail/disconnect`, {
+      method: 'DELETE',
+    })
+
+    if (!response.ok) {
+      throw new Error(`연결 해제 실패: ${response.status}`)
+    }
+
+    mailConnected.value = false
+    mailEmail.value = null
+    mailMessages.value = []
+    resetMailPagination()
+    mailTotalCount.value = 0
+    mailUnreadCount.value = 0
+    mailInboxTotalCount.value = 0
+    mailHasNext.value = false
+    mailSaveMessage.value = 'Gmail 연결을 해제했습니다.'
+  } catch (error) {
+    mailErrorMessage.value =
+      error instanceof Error ? error.message : 'Gmail 연결을 해제하지 못했습니다.'
+  } finally {
+    isMailDisconnecting.value = false
+  }
+}
+
+const handleMailCallbackParams = () => {
+  const params = new URLSearchParams(window.location.search)
+  const view = params.get('view')
+
+  if (view !== 'mail') {
+    return
+  }
+
+  activeView.value = 'mail'
+
+  const mailResult = params.get('mail')
+
+  if (mailResult === 'connected') {
+    mailSaveMessage.value = 'Gmail 연결에 성공했습니다.'
+  }
+
+  if (mailResult === 'error') {
+    mailErrorMessage.value = params.get('message') || 'Gmail 연결에 실패했습니다.'
+  }
+
+  window.history.replaceState({}, '', window.location.pathname)
+  void loadMailData()
+}
+
 const loadMdFiles = async (selectFirstFile = false) => {
   mdErrorMessage.value = ''
   isMdLoading.value = true
@@ -606,7 +956,71 @@ const handleTerminalAction = (action: TerminalAction) => {
   }
 }
 
+const handleMailListKeyboardShortcut = (event: KeyboardEvent) => {
+  if (activeView.value !== 'mail' || mailViewMode.value !== 'list' || !mailConnected.value) {
+    return false
+  }
+
+  if (!event.altKey || event.metaKey || event.ctrlKey) {
+    return false
+  }
+
+  if (event.key !== 'Enter') {
+    return false
+  }
+
+  event.preventDefault()
+
+  const firstMessage = mailMessages.value[0]
+
+  if (!isMailLoading.value && firstMessage) {
+    openMailDetail(firstMessage, 0)
+  }
+
+  return true
+}
+
+const handleMailDetailKeyboardShortcut = (event: KeyboardEvent) => {
+  if (activeView.value !== 'mail' || mailViewMode.value !== 'detail') {
+    return false
+  }
+
+  if (!event.altKey || event.metaKey || event.ctrlKey) {
+    return false
+  }
+
+  const key = event.key
+
+  if (key === 'ArrowLeft') {
+    event.preventDefault()
+    goMailDetailPrev()
+    return true
+  }
+
+  if (key === 'ArrowRight') {
+    event.preventDefault()
+    goMailDetailNext()
+    return true
+  }
+
+  if (key.toLowerCase() === 'd') {
+    event.preventDefault()
+    void deleteMailDetail()
+    return true
+  }
+
+  return false
+}
+
 const handleKeyboardShortcut = (event: KeyboardEvent) => {
+  if (handleMailListKeyboardShortcut(event)) {
+    return
+  }
+
+  if (handleMailDetailKeyboardShortcut(event)) {
+    return
+  }
+
   if (!event.metaKey || event.ctrlKey || event.altKey) {
     return
   }
@@ -633,23 +1047,29 @@ const handleKeyboardShortcut = (event: KeyboardEvent) => {
 
   if (key === '4') {
     event.preventDefault()
-    setActiveView('board')
+    setActiveView('mail')
     return
   }
 
   if (key === '5') {
     event.preventDefault()
-    setActiveView('member')
+    setActiveView('board')
     return
   }
 
   if (key === '6') {
     event.preventDefault()
-    setActiveView('swagger')
+    setActiveView('member')
     return
   }
 
   if (key === '7') {
+    event.preventDefault()
+    setActiveView('swagger')
+    return
+  }
+
+  if (key === '8') {
     event.preventDefault()
     setActiveView('api')
     return
@@ -740,6 +1160,7 @@ const handleMdContentClick = async (event: MouseEvent) => {
 
 onMounted(() => {
   handleCalendarCallbackParams()
+  handleMailCallbackParams()
   void loadMdFiles()
   window.addEventListener('keydown', handleKeyboardShortcut)
   mdListTimer = window.setInterval(() => {
@@ -820,6 +1241,47 @@ onUnmounted(() => {
         @refresh="loadCalendarData"
         @connect="connectGoogleCalendar"
         @disconnect="disconnectGoogleCalendar"
+      />
+
+      <MailView
+        v-if="activeView === 'mail' && mailViewMode === 'list'"
+        :connected="mailConnected"
+        :email="mailEmail"
+        :messages="mailMessages"
+        :unread-only="mailUnreadOnly"
+        :page-index="mailPageIndex"
+        :page-size="mailPageSize"
+        :total-count="mailTotalCount"
+        :unread-count="mailUnreadCount"
+        :inbox-total-count="mailInboxTotalCount"
+        :has-next="mailHasNext"
+        :error-message="mailErrorMessage"
+        :save-message="mailSaveMessage"
+        :is-loading="isMailLoading"
+        :is-connecting="isMailConnecting"
+        :is-disconnecting="isMailDisconnecting"
+        @refresh="refreshMailData"
+        @connect="connectGmail"
+        @disconnect="disconnectGmail"
+        @set-unread-only="setMailUnreadOnly"
+        @prev-page="goMailPrevPage"
+        @next-page="goMailNextPage"
+        @select-message="openMailDetail"
+      />
+
+      <MailDetailView
+        v-if="activeView === 'mail' && mailViewMode === 'detail'"
+        :detail="mailDetail"
+        :messages="mailMessages"
+        :selected-index="selectedMailIndex"
+        :error-message="mailErrorMessage"
+        :save-message="mailSaveMessage"
+        :is-loading="isMailDetailLoading"
+        :is-deleting="isMailDeleting"
+        @back="closeMailDetail"
+        @prev="goMailDetailPrev"
+        @next="goMailDetailNext"
+        @delete-mail="deleteMailDetail"
       />
 
       <SwaggerView v-if="activeView === 'swagger'" :swagger-url="SWAGGER_UI_URL" />

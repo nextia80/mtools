@@ -20,11 +20,16 @@ export type BoardPost = {
   updatedAt: string | null
 }
 
-export type ActiveView = 'home' | 'board' | 'member' | 'schedule' | 'swagger' | 'api' | 'docs'
+export type ActiveView = 'home' | 'board' | 'member' | 'schedule' | 'mail' | 'swagger' | 'api' | 'docs'
 
 export type MdViewMode = 'review' | 'edit'
 
 export type TerminalLineType = 'input' | 'output' | 'error'
+
+export type TerminalLineTextPart = {
+  text: string
+  color?: string
+}
 
 export type TerminalLineDraft = {
   type: TerminalLineType
@@ -32,6 +37,7 @@ export type TerminalLineDraft = {
   clickValue?: string
   indented?: boolean
   groupBreak?: boolean
+  textParts?: TerminalLineTextPart[]
 }
 
 export type TerminalLine = TerminalLineDraft & {
@@ -57,6 +63,43 @@ export type CalendarEvent = {
 export type CalendarConnectionStatus = {
   connected: boolean
   email: string | null
+}
+
+export type MailMessage = {
+  id: string
+  threadId: string
+  subject: string
+  from: string
+  date: string
+  snippet: string
+  unread: boolean
+}
+
+export type MailConnectionStatus = {
+  connected: boolean
+  email: string | null
+}
+
+export type MailMessageDetail = {
+  id: string
+  threadId: string
+  subject: string
+  from: string
+  date: string
+  snippet: string
+  unread: boolean
+  bodyText: string
+  bodyHtml: string | null
+}
+
+export type MailMessagesPage = {
+  messages: MailMessage[]
+  pageSize: number
+  totalCount: number
+  unreadCount: number
+  inboxTotalCount: number
+  nextPageToken: string | null
+  hasNext: boolean
 }
 
 export type CalendarListItem = {

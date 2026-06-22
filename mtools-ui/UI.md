@@ -37,12 +37,12 @@ npm run preview    # 빌드 결과 미리보기
 | 번호 | 메뉴 | 컴포넌트 | 설명 |
 |------|------|----------|------|
 | 1 | 터미널 | `TerminalView.vue` | `bd` / `gc` / `md` 명령 실행 |
-| 2 | 게시판 | `BoardView.vue` | 게시글 CRUD, 답글 |
-| 3 | 회원관리 | `MemberView.vue` | 회원 화면 (준비) |
-| 4 | 일정관리 | `ScheduleView.vue` | Google Calendar OAuth 연동 |
-| 5 | API 스웨거 | `SwaggerView.vue` | Swagger UI iframe |
-| 6 | API 테스트 | `ApiTestView.vue` | Echo 등 API 호출 테스트 |
-| 7 | 일자별 LOG | `DocsView.vue` | `MD/` Markdown 조회·편집 |
+| 2 | 일자별 LOG | `DocsView.vue` | `MD/` Markdown 조회·편집 |
+| 3 | 일정관리 | `ScheduleView.vue` | Google Calendar OAuth 연동 |
+| 4 | 게시판 | `BoardView.vue` | 게시글 CRUD, 답글 |
+| 5 | 회원관리 | `MemberView.vue` | 회원 화면 (준비) |
+| 6 | API 스웨거 | `SwaggerView.vue` | Swagger UI iframe |
+| 7 | API 테스트 | `ApiTestView.vue` | Echo 등 API 호출 테스트 |
 
 레이아웃·메뉴 상태는 `App.vue`, 좌측 사이드바는 `SidebarMenu.vue`에서 관리합니다.
 
@@ -53,12 +53,12 @@ npm run preview    # 빌드 결과 미리보기
 | 단축키 | 동작 |
 |--------|------|
 | `⌘1` | 터미널 |
-| `⌘2` | 게시판 |
-| `⌘3` | 회원관리 |
-| `⌘4` | 일정관리 |
-| `⌘5` | API 스웨거 |
-| `⌘6` | API 테스트 |
-| `⌘7` | 일자별 LOG |
+| `⌘2` | 일자별 LOG |
+| `⌘3` | 일정관리 |
+| `⌘4` | 게시판 |
+| `⌘5` | 회원관리 |
+| `⌘6` | API 스웨거 |
+| `⌘7` | API 테스트 |
 | `⌘←` | 좌측 메뉴 접기 |
 | `⌘→` | 좌측 메뉴 펼치기 |
 

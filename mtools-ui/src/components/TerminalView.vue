@@ -1,12 +1,13 @@
 <script setup lang="ts">
 import { nextTick, onMounted, ref, watch } from 'vue'
-import { executeTerminalCommand, terminalWelcomeLines } from '../terminal'
-import type { TerminalAction } from '../terminal'
+import { executeTerminalCommand, resolveCommandInput, terminalWelcomeLines } from '../terminal'
+import type { TerminalAction, TerminalContext } from '../terminal'
 import type { TerminalLine, TerminalLineDraft } from '../types'
 
 type TerminalCommandBlock = {
   id: number
   command: string
+  context: TerminalContext | null
   results: TerminalLine[]
 }
 
@@ -22,6 +23,7 @@ const emit = defineEmits<{
 const welcomeLines = ref<TerminalLine[]>([])
 const commandBlocks = ref<TerminalCommandBlock[]>([])
 const commandInput = ref('')
+const terminalContext = ref<TerminalContext | null>(null)
 const isRunning = ref(false)
 const outputRef = ref<HTMLElement | null>(null)
 const inputRef = ref<HTMLInputElement | null>(null)
@@ -59,8 +61,14 @@ const focusInput = () => {
   inputRef.value?.focus()
 }
 
-const canFillFromClick = (input: string) =>
-  /^(bd\s+(g|m|d)|md\s+g|gc\s+(m|r))\s*$/i.test(input.trimEnd())
+const canFillFromClick = (input: string, context: TerminalContext | null) => {
+  const resolved = resolveCommandInput(input.trimEnd(), context)
+
+  return /^(bd\s+(g|m|d)|md\s+g|gc\s+(m|r))\s*$/i.test(resolved.trimEnd())
+}
+
+const resolvedCommandInput = () =>
+  resolveCommandInput(commandInput.value.trimEnd(), terminalContext.value)
 
 const handleLineClick = async (line: TerminalLine) => {
   if (!line.clickValue || isRunning.value) {
@@ -69,7 +77,7 @@ const handleLineClick = async (line: TerminalLine) => {
 
   const input = commandInput.value.trimEnd()
 
-  if (!canFillFromClick(input)) {
+  if (!canFillFromClick(input, terminalContext.value)) {
     return
   }
 
@@ -89,9 +97,11 @@ const runCommand = async () => {
   }
 
   blockId += 1
+  const currentContext = terminalContext.value
   const block: TerminalCommandBlock = {
     id: blockId,
     command,
+    context: currentContext,
     results: [],
   }
 
@@ -102,7 +112,11 @@ const runCommand = async () => {
   isRunning.value = true
 
   try {
-    const result = await executeTerminalCommand(command, props.apiBaseUrl)
+    const result = await executeTerminalCommand(command, props.apiBaseUrl, currentContext)
+
+    if (result.context !== undefined) {
+      terminalContext.value = result.context
+    }
 
     if (result.clear) {
       clearTerminal()
@@ -209,7 +223,11 @@ defineExpose({ focusInput })
         >
           <div class="terminal-line terminal-line-input">
             <span class="terminal-prompt" aria-hidden="true">
-              <span class="terminal-prompt-arrow">➜</span>
+              <template v-if="block.context">
+                <span class="terminal-prompt-context">({{ block.context }})</span>
+                <span class="terminal-prompt-divider">|</span>
+              </template>
+              <span v-else class="terminal-prompt-arrow">➜</span>
             </span>
             <pre class="terminal-text terminal-text-command">{{ block.command }}</pre>
           </div>
@@ -218,25 +236,31 @@ defineExpose({ focusInput })
             v-if="block.results.length > 0 || (isRunning && blockIndex === commandBlocks.length - 1)"
           >
             <div class="terminal-command-results">
-              <div
-                v-for="line in block.results"
-                :key="line.id"
-                class="terminal-line terminal-line-result"
-                :class="[
-                  `terminal-line-${line.type}`,
-                  { 'terminal-line-group-break': line.groupBreak },
-                ]"
-              >
-                <button
-                  v-if="line.clickValue && line.type === 'output'"
-                  type="button"
-                  class="terminal-text terminal-text-clickable"
-                  :title="`${commandInput.trimEnd()} ${line.clickValue}`"
-                  @click.stop="handleLineClick(line)"
+              <div v-for="line in block.results" :key="line.id" class="terminal-result-block">
+                <hr v-if="line.groupBreak" class="terminal-line-separator" />
+
+                <div
+                  class="terminal-line terminal-line-result"
+                  :class="`terminal-line-${line.type}`"
                 >
-                  {{ line.text }}
-                </button>
-                <pre v-else class="terminal-text">{{ line.text }}</pre>
+                  <button
+                    v-if="line.clickValue && line.type === 'output'"
+                    type="button"
+                    class="terminal-text terminal-text-clickable"
+                    :title="`${resolvedCommandInput()} ${line.clickValue}`"
+                    @click.stop="handleLineClick(line)"
+                  ><template v-if="line.textParts?.length"><span
+                      v-for="(part, partIndex) in line.textParts"
+                      :key="partIndex"
+                      :style="part.color ? { color: part.color } : undefined"
+                    >{{ part.text }}</span></template><template v-else>{{ line.text }}</template></button>
+                  <pre v-else-if="!line.textParts?.length" class="terminal-text">{{ line.text }}</pre>
+                  <span v-else class="terminal-text terminal-text-line"><span
+                      v-for="(part, partIndex) in line.textParts"
+                      :key="partIndex"
+                      :style="part.color ? { color: part.color } : undefined"
+                    >{{ part.text }}</span></span>
+                </div>
               </div>
 
               <p
@@ -251,7 +275,11 @@ defineExpose({ focusInput })
 
         <form class="terminal-line terminal-line-active" @submit.prevent="runCommand" @click.stop>
           <span class="terminal-prompt" aria-hidden="true">
-            <span class="terminal-prompt-arrow">➜</span>
+            <template v-if="terminalContext">
+              <span class="terminal-prompt-context">({{ terminalContext }})</span>
+              <span class="terminal-prompt-divider">|</span>
+            </template>
+            <span v-else class="terminal-prompt-arrow">➜</span>
           </span>
           <input
             ref="inputRef"

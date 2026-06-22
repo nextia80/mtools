@@ -563,23 +563,27 @@ public class GoogleCalendarService {
 			Map<String, Integer> calendarKeyMap
 	) throws IOException {
 		String calendarId = calendarEntry.getId();
-		Events events = googleCalendar.events().list(calendarId)
-				.setTimeMin(new DateTime(timeMin.toEpochMilli()))
-				.setTimeMax(new DateTime(timeMax.toEpochMilli()))
-				.setOrderBy("startTime")
-				.setSingleEvents(true)
-				.setMaxResults(100)
-				.execute();
-
-		if (events.getItems() == null) {
-			return List.of();
-		}
-
 		List<CalendarEvent> result = new ArrayList<>();
+		String pageToken = null;
 
-		for (Event event : events.getItems()) {
-			result.add(toCalendarEvent(event, calendarEntry, calendarKeyMap));
-		}
+		do {
+			Events events = googleCalendar.events().list(calendarId)
+					.setTimeMin(new DateTime(timeMin.toEpochMilli()))
+					.setTimeMax(new DateTime(timeMax.toEpochMilli()))
+					.setOrderBy("startTime")
+					.setSingleEvents(true)
+					.setMaxResults(250)
+					.setPageToken(pageToken)
+					.execute();
+
+			if (events.getItems() != null) {
+				for (Event event : events.getItems()) {
+					result.add(toCalendarEvent(event, calendarEntry, calendarKeyMap));
+				}
+			}
+
+			pageToken = events.getNextPageToken();
+		} while (pageToken != null && !pageToken.isBlank());
 
 		return result;
 	}

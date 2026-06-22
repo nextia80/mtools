@@ -2,14 +2,18 @@ import type { TerminalLineDraft } from '../types'
 import { executeBdCommand } from './commands/boardCommand'
 import { executeGcCommand } from './commands/calendarCommand'
 import { executeMdCommand } from './commands/mdCommand'
-import { executeHelpCommand, isHelpCommand } from './help'
+import { isCdCommand, parseCdCommand, resolveCommandInput, type TerminalContext } from './context'
+import { executeHelpCommand, formatKeywordHelpLines, isHelpCommand, parseContextHelpCommand } from './help'
 import type { TerminalCommandResult } from './types'
 
 export type { TerminalAction, TerminalCommandResult } from './types'
+export type { TerminalContext } from './context'
+export { resolveCommandInput } from './context'
 
 export const executeTerminalCommand = async (
   input: string,
   apiBaseUrl: string,
+  context: TerminalContext | null = null,
 ): Promise<TerminalCommandResult> => {
   const trimmed = input.trim()
 
@@ -26,6 +30,16 @@ export const executeTerminalCommand = async (
       return { lines: [], clear: true }
     }
 
+    if (isCdCommand(trimmed)) {
+      const parsed = parseCdCommand(trimmed, context)
+
+      if ('error' in parsed) {
+        return { lines: [{ type: 'error', text: parsed.error }] }
+      }
+
+      return { lines: [], context: parsed.context }
+    }
+
     if (trimmed === '<') {
       return {
         lines: [{ type: 'output', text: '좌측 메뉴를 접었습니다.' }],
@@ -40,18 +54,29 @@ export const executeTerminalCommand = async (
       }
     }
 
-    const group = trimmed.split(/\s+/)[0]?.toLowerCase() ?? ''
+    const resolved = resolveCommandInput(trimmed, context)
+    const contextHelp = parseContextHelpCommand(resolved)
+
+    if (contextHelp) {
+      if ('error' in contextHelp) {
+        return { lines: [{ type: 'error', text: contextHelp.error }] }
+      }
+
+      return { lines: formatKeywordHelpLines(contextHelp.keyword) }
+    }
+
+    const group = resolved.split(/\s+/)[0]?.toLowerCase() ?? ''
 
     if (group === 'bd') {
-      return executeBdCommand(trimmed, apiBaseUrl)
+      return executeBdCommand(resolved, apiBaseUrl)
     }
 
     if (group === 'gc') {
-      return executeGcCommand(trimmed, apiBaseUrl)
+      return executeGcCommand(resolved, apiBaseUrl)
     }
 
     if (group === 'md') {
-      return executeMdCommand(trimmed, apiBaseUrl)
+      return executeMdCommand(resolved, apiBaseUrl)
     }
 
     return {
@@ -71,5 +96,6 @@ export const executeTerminalCommand = async (
 
 export const terminalWelcomeLines = (): TerminalLineDraft[] => [
   { type: 'output', text: 'mtools terminal — bd / gc / md 명령어로 데이터를 조회합니다.' },
-  { type: 'output', text: '/? 를 입력하면 사용 가능한 명령어를 볼 수 있습니다.' },
+  { type: 'output', text: 'cd gc → cd l 로 하위 모드 진입, cd /gc 으로 상위 복귀.' },
+  { type: 'output', text: '/? 또는 gc -? 형식으로 도움말을 볼 수 있습니다.' },
 ]

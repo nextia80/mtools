@@ -39,6 +39,18 @@ const fetchWithTimeout = (url: string, init?: RequestInit) => {
   })
 }
 
+const toFetchError = (error: unknown) => {
+  if (error instanceof DOMException && error.name === 'AbortError') {
+    return new Error('요청 시간이 초과되었습니다. API 서버 상태를 확인하세요.')
+  }
+
+  if (error instanceof TypeError && error.message === 'Failed to fetch') {
+    return new Error('API 서버에 연결할 수 없습니다. mtools-api(8080)가 실행 중인지 확인하세요.')
+  }
+
+  return error
+}
+
 export const fetchJson = async <T>(url: string): Promise<T> => {
   try {
     const response = await fetchWithTimeout(url)
@@ -50,8 +62,10 @@ export const fetchJson = async <T>(url: string): Promise<T> => {
 
     return (await response.json()) as T
   } catch (error) {
-    if (error instanceof DOMException && error.name === 'AbortError') {
-      throw new Error('요청 시간이 초과되었습니다. API 서버 상태를 확인하세요.')
+    const mapped = toFetchError(error)
+
+    if (mapped instanceof Error) {
+      throw mapped
     }
 
     throw error
@@ -73,8 +87,10 @@ export const requestJson = async <T>(url: string, method: string, body?: unknown
 
     return (await response.json()) as T
   } catch (error) {
-    if (error instanceof DOMException && error.name === 'AbortError') {
-      throw new Error('요청 시간이 초과되었습니다. API 서버 상태를 확인하세요.')
+    const mapped = toFetchError(error)
+
+    if (mapped instanceof Error) {
+      throw mapped
     }
 
     throw error

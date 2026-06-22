@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.mtools.api.mail.dao.GmailOAuthDao">
+	<resultMap id="GoogleOAuthTokenMap" type="com.mtools.api.calendar.service.GoogleOAuthToken">
+		<constructor>
+			<arg column="st_access_token" javaType="java.lang.String" />
+			<arg column="st_refresh_token" javaType="java.lang.String" />
+			<arg column="expires_at" javaType="java.time.LocalDateTime" />
+			<arg column="st_email" javaType="java.lang.String" />
+		</constructor>
+	</resultMap>
+
+	<select id="find" resultMap="GoogleOAuthTokenMap">
+		SELECT
+			st_access_token,
+			st_refresh_token,
+			dt_expires_at AS expires_at,
+			st_email
+		FROM t_google_gmail_oauth
+		WHERE id_oauth = 1
+	</select>
+
+	<insert id="upsert">
+		INSERT INTO t_google_gmail_oauth (
+			id_oauth,
+			st_access_token,
+			st_refresh_token,
+			dt_expires_at,
+			st_email,
+			dt_updated
+		)
+		VALUES (
+			1,
+			#{accessToken},
+			#{refreshToken},
+			#{expiresAt},
+			#{email},
+			CURRENT_TIMESTAMP
+		)
+		ON CONFLICT (id_oauth) DO UPDATE SET
+			st_access_token = EXCLUDED.st_access_token,
+			st_refresh_token = COALESCE(EXCLUDED.st_refresh_token, t_google_gmail_oauth.st_refresh_token),
+			dt_expires_at = EXCLUDED.dt_expires_at,
+			st_email = EXCLUDED.st_email,
+			dt_updated = CURRENT_TIMESTAMP
+	</insert>
+
+	<delete id="deleteAll">
+		DELETE FROM t_google_gmail_oauth
+		WHERE id_oauth = 1
+	</delete>
+</mapper>

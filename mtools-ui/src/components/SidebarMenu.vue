@@ -106,12 +106,22 @@ const formatMdMenuFileName = (name: string) =>
       </button>
       <button
         class="primary-menu-item"
+        :class="{ active: activeView === 'mail' }"
+        type="button"
+        title="메일관리"
+        @click="$emit('setActiveView', 'mail')"
+      >
+        <span class="menu-icon">4</span>
+        <strong>메일관리</strong>
+      </button>
+      <button
+        class="primary-menu-item"
         :class="{ active: activeView === 'board' }"
         type="button"
         title="게시판"
         @click="$emit('setActiveView', 'board')"
       >
-        <span class="menu-icon">4</span>
+        <span class="menu-icon">5</span>
         <strong>게시판</strong>
       </button>
       <button
@@ -121,7 +131,7 @@ const formatMdMenuFileName = (name: string) =>
         title="회원관리"
         @click="$emit('setActiveView', 'member')"
       >
-        <span class="menu-icon">5</span>
+        <span class="menu-icon">6</span>
         <strong>회원관리</strong>
       </button>
       <button
@@ -131,7 +141,7 @@ const formatMdMenuFileName = (name: string) =>
         title="API 스웨거"
         @click="$emit('setActiveView', 'swagger')"
       >
-        <span class="menu-icon">6</span>
+        <span class="menu-icon">7</span>
         <strong>API 스웨거</strong>
       </button>
       <button
@@ -141,7 +151,7 @@ const formatMdMenuFileName = (name: string) =>
         title="API 테스트"
         @click="$emit('setActiveView', 'api')"
       >
-        <span class="menu-icon">7</span>
+        <span class="menu-icon">8</span>
         <strong>API 테스트</strong>
       </button>
     </nav>
