@@ -27,17 +27,20 @@ CREATE TABLE IF NOT EXISTS t_board (
 CREATE INDEX IF NOT EXISTS idx_t_board_pid_order ON t_board (st_pid, st_order);
 
 CREATE TABLE IF NOT EXISTS t_member (
-	id_member NUMERIC(10),
-	st_member VARCHAR(100),
+	id_member NUMERIC(10) PRIMARY KEY,
+	st_member VARCHAR(100) NOT NULL,
+	st_password VARCHAR(255),
 	st_name VARCHAR(1000),
 	st_email VARCHAR(1000),
 	st_level VARCHAR(10) DEFAULT '99',
-	yn_use VARCHAR(1),
+	yn_use VARCHAR(1) DEFAULT 'Y',
 	id_insert NUMERIC(10),
 	dt_insert TIMESTAMP,
 	id_update NUMERIC(10),
 	dt_update TIMESTAMP
 );
+
+ALTER TABLE t_member ADD COLUMN IF NOT EXISTS st_password VARCHAR(255);
 
 CREATE TABLE IF NOT EXISTS t_google_oauth (
 	id_oauth NUMERIC(10) PRIMARY KEY DEFAULT 1,

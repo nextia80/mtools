@@ -12,7 +12,9 @@ const parseHttpError = (raw: string, status: number) => {
       message = body.error
     }
   } catch {
-    if (status === 404) {
+    if (raw.includes('No static resource')) {
+      message = 'API를 찾을 수 없습니다. mtools-api 서버를 재시작하세요.'
+    } else if (status === 404) {
       message = `API를 찾을 수 없습니다 (${status}). 백엔드 서버를 재시작했는지 확인하세요.`
     }
   }

@@ -198,9 +198,11 @@ public class GoogleCalendarService {
 			Integer calendarKey,
 			String summary,
 			String dateYmd,
+			String endDateYmd,
 			String timeHm,
 			String endTimeHm,
-			Integer durationMinutes
+			Integer durationMinutes,
+			String description
 	) throws IOException {
 		if (summary == null || summary.isBlank()) {
 			throw new IllegalArgumentException("일정 제목을 입력하세요.");
@@ -229,11 +231,17 @@ public class GoogleCalendarService {
 				: parseLocalDate(dateYmd);
 		Event event = new Event().setSummary(summary.trim());
 
+		if (description != null && !description.isBlank()) {
+			event.setDescription(description.trim());
+		}
+
 		if (timeHm == null || timeHm.isBlank()) {
 			String startDate = date.toString();
-			String endDate = date.plusDays(1).toString();
+			LocalDate exclusiveEnd = endDateYmd == null || endDateYmd.isBlank()
+					? date.plusDays(1)
+					: parseLocalDate(endDateYmd).plusDays(1);
 			event.setStart(new EventDateTime().setDate(new DateTime(startDate)));
-			event.setEnd(new EventDateTime().setDate(new DateTime(endDate)));
+			event.setEnd(new EventDateTime().setDate(new DateTime(exclusiveEnd.toString())));
 		} else {
 			LocalTime startTime = parseLocalTime(timeHm);
 			ZonedDateTime start = ZonedDateTime.of(date, startTime, CALENDAR_ZONE);

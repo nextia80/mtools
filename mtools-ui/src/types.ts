@@ -20,6 +20,17 @@ export type BoardPost = {
   updatedAt: string | null
 }
 
+export type Member = {
+  idMember: string
+  memberId: string
+  name: string
+  email: string | null
+  level: string
+  ynUse: string
+  insertedAt: string | null
+  updatedAt: string | null
+}
+
 export type ActiveView = 'home' | 'board' | 'member' | 'schedule' | 'mail' | 'swagger' | 'api' | 'docs'
 
 export type MdViewMode = 'review' | 'edit'
@@ -38,6 +49,14 @@ export type TerminalLineDraft = {
   indented?: boolean
   groupBreak?: boolean
   textParts?: TerminalLineTextPart[]
+  htmlContent?: string
+  mailScrollAnchor?: 'start' | 'end'
+  mailRef?: string
+  logo?: boolean
+  logoSubtitle?: boolean
+  bannerBar?: boolean
+  welcomeStatus?: boolean
+  logoMark?: boolean
 }
 
 export type TerminalLine = TerminalLineDraft & {

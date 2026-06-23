@@ -10,14 +10,18 @@ const props = defineProps<{
   saveMessage: string
   isLoading: boolean
   isDeleting: boolean
+  isArchiving: boolean
 }>()
 
 defineEmits<{
   back: []
   prev: []
   next: []
+  archiveMail: []
   deleteMail: []
 }>()
+
+const isBusy = computed(() => props.isLoading || props.isDeleting || props.isArchiving)
 
 const hasPrev = computed(() => props.selectedIndex > 0)
 const hasNext = computed(() => props.selectedIndex >= 0 && props.selectedIndex < props.messages.length - 1)
@@ -43,17 +47,14 @@ const formatSender = (from: string) => {
 
 <template>
   <section class="view-panel mail-detail-view">
-    <div class="docs-header">
-      <div>
+    <div class="docs-header mail-detail-header">
+      <div class="mail-detail-heading">
         <span class="eyebrow">Mail Detail</span>
-        <h1>{{ detail?.subject || '메일 상세' }}</h1>
+        <h1 class="mail-detail-title">{{ detail?.subject || '메일 상세' }}</h1>
         <p v-if="detail" class="mail-subtitle">
           {{ formatSender(detail.from) }}
           <span v-if="detail.date"> · {{ detail.date }}</span>
         </p>
-      </div>
-      <div class="mail-header-actions">
-        <button class="secondary-button" type="button" @click="$emit('back')">목록</button>
       </div>
     </div>
 
@@ -65,7 +66,7 @@ const formatSender = (from: string) => {
       <button
         class="secondary-button mail-page-button"
         type="button"
-        :disabled="isLoading || isDeleting || !hasPrev"
+        :disabled="isBusy || !hasPrev"
         @click="$emit('prev')"
       >
         이전 (⌥←)
@@ -74,19 +75,32 @@ const formatSender = (from: string) => {
       <button
         class="secondary-button mail-page-button"
         type="button"
-        :disabled="isLoading || isDeleting || !hasNext"
+        :disabled="isBusy || !hasNext"
         @click="$emit('next')"
       >
         다음 (⌥→)
       </button>
-      <button
-        class="board-submit-button mail-delete-button"
-        type="button"
-        :disabled="isLoading || isDeleting || !detail"
-        @click="$emit('deleteMail')"
-      >
-        {{ isDeleting ? '삭제 중' : '삭제 (⌥D)' }}
-      </button>
+      <div class="mail-detail-toolbar-actions">
+        <button class="secondary-button mail-toolbar-button" type="button" @click="$emit('back')">
+          목록
+        </button>
+        <button
+          class="secondary-button mail-toolbar-button mail-archive-button"
+          type="button"
+          :disabled="isBusy || !detail"
+          @click="$emit('archiveMail')"
+        >
+          {{ isArchiving ? '보관 중' : '보관' }}
+        </button>
+        <button
+          class="board-submit-button mail-toolbar-button mail-delete-button"
+          type="button"
+          :disabled="isBusy || !detail"
+          @click="$emit('deleteMail')"
+        >
+          {{ isDeleting ? '삭제 중' : '삭제 (⌥D)' }}
+        </button>
+      </div>
     </div>
 
     <div v-if="detail" class="mail-detail-panel" :class="{ 'is-loading': isLoading }">

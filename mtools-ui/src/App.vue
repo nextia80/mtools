@@ -12,13 +12,38 @@ import SidebarMenu from './components/SidebarMenu.vue'
 import SwaggerView from './components/SwaggerView.vue'
 import TerminalView from './components/TerminalView.vue'
 import type { TerminalAction } from './terminal'
-import type { ActiveView, BoardPost, CalendarConnectionStatus, CalendarEvent, MailConnectionStatus, MailMessage, MailMessageDetail, MailMessagesPage, MdFile, MdViewMode } from './types'
+import { normalizeLastSessionLabel } from './terminal/textUtils'
+import type { ActiveView, BoardPost, CalendarConnectionStatus, CalendarEvent, MailConnectionStatus, MailMessage, MailMessageDetail, MailMessagesPage, MdFile, MdViewMode, Member } from './types'
 
 const API_BASE_URL = 'http://localhost:8080'
 const SWAGGER_UI_URL = `${API_BASE_URL}/swagger-ui/index.html`
 
 const activeView = ref<ActiveView>('home')
-const sidebarCollapsed = ref(false)
+const sidebarCollapsed = ref(true)
+const currentMember = ref<Member | null>(null)
+const memberLoggedInAt = ref<string | null>(null)
+const MEMBER_STORAGE_KEY = 'mtools-current-member'
+const LAST_SESSION_STORAGE_KEY = 'mtools-last-session-label'
+
+type MemberSession = {
+  member: Member
+  loggedInAt: string
+}
+
+const storedLastSessionLabel = localStorage.getItem(LAST_SESSION_STORAGE_KEY)
+const initialLastSessionLabel = normalizeLastSessionLabel(storedLastSessionLabel)
+
+if (storedLastSessionLabel && !initialLastSessionLabel) {
+  localStorage.removeItem(LAST_SESSION_STORAGE_KEY)
+} else if (
+  storedLastSessionLabel
+  && initialLastSessionLabel
+  && storedLastSessionLabel !== initialLastSessionLabel
+) {
+  localStorage.setItem(LAST_SESSION_STORAGE_KEY, initialLastSessionLabel)
+}
+
+const lastSessionLabel = ref<string | null>(initialLastSessionLabel)
 const terminalViewRef = ref<{ focusInput: () => void } | null>(null)
 const apiEndpoint = ref('/api/echo')
 const apiInput = ref('{\n  "id": "a"\n}')
@@ -33,6 +58,18 @@ const boardErrorMessage = ref('')
 const boardSaveMessage = ref('')
 const isBoardLoading = ref(false)
 const isBoardSaving = ref(false)
+const members = ref<Member[]>([])
+const memberFormMemberId = ref('')
+const memberFormPassword = ref('')
+const memberFormName = ref('')
+const memberFormEmail = ref('')
+const memberFormLevel = ref('1')
+const memberFormYnUse = ref('Y')
+const editingMemberId = ref<string | null>(null)
+const memberErrorMessage = ref('')
+const memberSaveMessage = ref('')
+const isMemberLoading = ref(false)
+const isMemberSaving = ref(false)
 const mdFiles = ref<MdFile[]>([])
 const selectedMdPath = ref('')
 const openMdDate = ref('')
@@ -68,6 +105,7 @@ const mailDetail = ref<MailMessageDetail | null>(null)
 const selectedMailIndex = ref(-1)
 const isMailDetailLoading = ref(false)
 const isMailDeleting = ref(false)
+const isMailArchiving = ref(false)
 const mailErrorMessage = ref('')
 const mailSaveMessage = ref('')
 const isMailLoading = ref(false)
@@ -128,7 +166,78 @@ const mdFilesByDate = computed(() => {
     }))
 })
 
+const isLoggedIn = computed(() => currentMember.value !== null)
+
+const canAccessMenus = computed(() => {
+  if (!currentMember.value) {
+    return false
+  }
+
+  const level = Number(currentMember.value.level)
+
+  return level <= 1
+})
+
+const restoreCurrentMember = () => {
+  const saved = localStorage.getItem(MEMBER_STORAGE_KEY)
+
+  if (!saved) {
+    return
+  }
+
+  try {
+    const parsed = JSON.parse(saved) as Member | MemberSession
+
+    if (parsed && typeof parsed === 'object' && 'member' in parsed) {
+      currentMember.value = parsed.member
+      memberLoggedInAt.value = parsed.loggedInAt
+      return
+    }
+
+    currentMember.value = parsed as Member
+    memberLoggedInAt.value = new Date().toISOString()
+  } catch {
+    localStorage.removeItem(MEMBER_STORAGE_KEY)
+  }
+}
+
+const handleMemberLogin = (member: Member) => {
+  const loggedInAt = new Date().toISOString()
+
+  currentMember.value = member
+  memberLoggedInAt.value = loggedInAt
+  lastSessionLabel.value = null
+  localStorage.removeItem(LAST_SESSION_STORAGE_KEY)
+  localStorage.setItem(
+    MEMBER_STORAGE_KEY,
+    JSON.stringify({ member, loggedInAt } satisfies MemberSession),
+  )
+}
+
+const handleMemberLogout = (sessionDurationLabel?: string) => {
+  currentMember.value = null
+  memberLoggedInAt.value = null
+  localStorage.removeItem(MEMBER_STORAGE_KEY)
+
+  if (sessionDurationLabel) {
+    const normalized = normalizeLastSessionLabel(sessionDurationLabel)
+
+    if (normalized) {
+      lastSessionLabel.value = normalized
+      localStorage.setItem(LAST_SESSION_STORAGE_KEY, normalized)
+    }
+  }
+
+  if (activeView.value !== 'home') {
+    activeView.value = 'home'
+  }
+}
+
 const setActiveView = (view: ActiveView) => {
+  if (view !== 'home' && !canAccessMenus.value) {
+    return
+  }
+
   activeView.value = view
 
   if (view === 'docs') {
@@ -142,6 +251,10 @@ const setActiveView = (view: ActiveView) => {
 
   if (view === 'board') {
     void loadBoardPosts()
+  }
+
+  if (view === 'member') {
+    void loadMembers()
   }
 
   if (view === 'schedule') {
@@ -312,6 +425,149 @@ const saveBoardPost = async () => {
       error instanceof Error ? error.message : '게시글을 저장하지 못했습니다.'
   } finally {
     isBoardSaving.value = false
+  }
+}
+
+const parseMemberApiError = async (response: Response, fallback: string) => {
+  const raw = await response.text()
+
+  try {
+    const body = JSON.parse(raw) as { message?: string }
+
+    if (body.message) {
+      return body.message
+    }
+  } catch {
+    // ignore JSON parse errors
+  }
+
+  return raw || fallback
+}
+
+const resetMemberForm = () => {
+  editingMemberId.value = null
+  memberFormMemberId.value = ''
+  memberFormPassword.value = ''
+  memberFormName.value = ''
+  memberFormEmail.value = ''
+  memberFormLevel.value = '1'
+  memberFormYnUse.value = 'Y'
+}
+
+const loadMembers = async () => {
+  memberErrorMessage.value = ''
+  isMemberLoading.value = true
+
+  try {
+    const response = await fetch(`${API_BASE_URL}/api/members`)
+
+    if (!response.ok) {
+      throw new Error(await parseMemberApiError(response, `회원 조회 실패: ${response.status}`))
+    }
+
+    members.value = (await response.json()) as Member[]
+  } catch (error) {
+    memberErrorMessage.value =
+      error instanceof Error ? error.message : '회원 목록을 불러오지 못했습니다.'
+  } finally {
+    isMemberLoading.value = false
+  }
+}
+
+const editMember = (member: Member) => {
+  editingMemberId.value = member.idMember
+  memberFormMemberId.value = member.memberId
+  memberFormPassword.value = ''
+  memberFormName.value = member.name ?? ''
+  memberFormEmail.value = member.email ?? ''
+  memberFormLevel.value = member.level ?? '99'
+  memberFormYnUse.value = member.ynUse ?? 'Y'
+  memberErrorMessage.value = ''
+  memberSaveMessage.value = ''
+}
+
+const saveMember = async () => {
+  if (!memberFormMemberId.value.trim()) {
+    memberErrorMessage.value = '아이디를 입력하세요.'
+    return
+  }
+
+  if (!memberFormName.value.trim()) {
+    memberErrorMessage.value = '이름을 입력하세요.'
+    return
+  }
+
+  if (!editingMemberId.value && !memberFormPassword.value.trim()) {
+    memberErrorMessage.value = '비밀번호를 입력하세요.'
+    return
+  }
+
+  memberErrorMessage.value = ''
+  memberSaveMessage.value = ''
+  isMemberSaving.value = true
+
+  const isEditing = editingMemberId.value !== null
+  const url = isEditing
+    ? `${API_BASE_URL}/api/members/${editingMemberId.value}`
+    : `${API_BASE_URL}/api/members`
+
+  try {
+    const response = await fetch(url, {
+      method: isEditing ? 'PUT' : 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        memberId: memberFormMemberId.value.trim(),
+        password: memberFormPassword.value,
+        name: memberFormName.value.trim(),
+        email: memberFormEmail.value.trim(),
+        level: memberFormLevel.value.trim() || '99',
+        ynUse: memberFormYnUse.value,
+      }),
+    })
+
+    if (!response.ok) {
+      throw new Error(await parseMemberApiError(response, `회원 저장 실패: ${response.status}`))
+    }
+
+    resetMemberForm()
+    memberSaveMessage.value = isEditing ? '회원 정보를 수정했습니다.' : '회원을 등록했습니다.'
+    await loadMembers()
+  } catch (error) {
+    memberErrorMessage.value =
+      error instanceof Error ? error.message : '회원을 저장하지 못했습니다.'
+  } finally {
+    isMemberSaving.value = false
+  }
+}
+
+const deleteMember = async (member: Member) => {
+  if (!window.confirm(`"${member.memberId}" 회원을 삭제할까요?`)) {
+    return
+  }
+
+  memberErrorMessage.value = ''
+  memberSaveMessage.value = ''
+
+  try {
+    const response = await fetch(`${API_BASE_URL}/api/members/${member.idMember}`, {
+      method: 'DELETE',
+    })
+
+    if (!response.ok) {
+      throw new Error(await parseMemberApiError(response, `회원 삭제 실패: ${response.status}`))
+    }
+
+    if (editingMemberId.value === member.idMember) {
+      resetMemberForm()
+    }
+
+    memberSaveMessage.value = '회원을 삭제했습니다.'
+    await loadMembers()
+  } catch (error) {
+    memberErrorMessage.value =
+      error instanceof Error ? error.message : '회원을 삭제하지 못했습니다.'
   }
 }
 
@@ -621,10 +877,11 @@ const closeMailDetail = () => {
   mailDetail.value = null
   isMailDetailLoading.value = false
   isMailDeleting.value = false
+  isMailArchiving.value = false
 }
 
 const goMailDetailPrev = () => {
-  if (selectedMailIndex.value <= 0 || isMailDetailLoading.value || isMailDeleting.value) {
+  if (selectedMailIndex.value <= 0 || isMailDetailLoading.value || isMailDeleting.value || isMailArchiving.value) {
     return
   }
 
@@ -642,6 +899,7 @@ const goMailDetailNext = () => {
     || selectedMailIndex.value >= mailMessages.value.length - 1
     || isMailDetailLoading.value
     || isMailDeleting.value
+    || isMailArchiving.value
   ) {
     return
   }
@@ -702,6 +960,57 @@ const deleteMailDetail = async () => {
       error instanceof Error ? error.message : '메일을 삭제하지 못했습니다.'
   } finally {
     isMailDeleting.value = false
+  }
+}
+
+const archiveMailDetail = async () => {
+  const messageId = mailDetail.value?.id
+
+  if (!messageId || isMailArchiving.value || isMailDeleting.value) {
+    return
+  }
+
+  if (!window.confirm('이 메일을 보관할까요?')) {
+    return
+  }
+
+  isMailArchiving.value = true
+  mailErrorMessage.value = ''
+  mailSaveMessage.value = ''
+
+  try {
+    const response = await fetch(`${API_BASE_URL}/api/mail/messages/${messageId}/archive`, {
+      method: 'POST',
+    })
+
+    if (!response.ok) {
+      const message = await response.text()
+      throw new Error(message || `메일 보관 실패: ${response.status}`)
+    }
+
+    const deletedIndex = selectedMailIndex.value
+    mailMessages.value = mailMessages.value.filter((message) => message.id !== messageId)
+    mailSaveMessage.value = '메일을 보관했습니다.'
+
+    if (mailMessages.value.length === 0) {
+      closeMailDetail()
+      await loadMailData(mailPageIndex.value)
+      return
+    }
+
+    const nextIndex = Math.min(deletedIndex, mailMessages.value.length - 1)
+    const nextMessage = mailMessages.value[nextIndex]
+
+    if (nextMessage) {
+      openMailDetail(nextMessage, nextIndex)
+    } else {
+      closeMailDetail()
+    }
+  } catch (error) {
+    mailErrorMessage.value =
+      error instanceof Error ? error.message : '메일을 보관하지 못했습니다.'
+  } finally {
+    isMailArchiving.value = false
   }
 }
 
@@ -923,6 +1232,16 @@ const toggleSidebarCollapsed = () => {
 }
 
 const handleTerminalAction = (action: TerminalAction) => {
+  if (action.type === 'member-login') {
+    handleMemberLogin(action.member)
+    return
+  }
+
+  if (action.type === 'member-logout') {
+    handleMemberLogout(action.sessionDurationLabel)
+    return
+  }
+
   if (action.type === 'sidebar-set-collapsed') {
     sidebarCollapsed.value = action.collapsed
     return
@@ -1035,43 +1354,71 @@ const handleKeyboardShortcut = (event: KeyboardEvent) => {
 
   if (key === '2') {
     event.preventDefault()
-    openDocsMenu()
+
+    if (canAccessMenus.value) {
+      openDocsMenu()
+    }
+
     return
   }
 
   if (key === '3') {
     event.preventDefault()
-    setActiveView('schedule')
+
+    if (canAccessMenus.value) {
+      setActiveView('schedule')
+    }
+
     return
   }
 
   if (key === '4') {
     event.preventDefault()
-    setActiveView('mail')
+
+    if (canAccessMenus.value) {
+      setActiveView('mail')
+    }
+
     return
   }
 
   if (key === '5') {
     event.preventDefault()
-    setActiveView('board')
+
+    if (canAccessMenus.value) {
+      setActiveView('board')
+    }
+
     return
   }
 
   if (key === '6') {
     event.preventDefault()
-    setActiveView('member')
+
+    if (canAccessMenus.value) {
+      setActiveView('member')
+    }
+
     return
   }
 
   if (key === '7') {
     event.preventDefault()
-    setActiveView('swagger')
+
+    if (canAccessMenus.value) {
+      setActiveView('swagger')
+    }
+
     return
   }
 
   if (key === '8') {
     event.preventDefault()
-    setActiveView('api')
+
+    if (canAccessMenus.value) {
+      setActiveView('api')
+    }
+
     return
   }
 
@@ -1159,6 +1506,7 @@ const handleMdContentClick = async (event: MouseEvent) => {
 }
 
 onMounted(() => {
+  restoreCurrentMember()
   handleCalendarCallbackParams()
   handleMailCallbackParams()
   void loadMdFiles()
@@ -1182,6 +1530,7 @@ onUnmounted(() => {
     <SidebarMenu
       :active-view="activeView"
       :collapsed="sidebarCollapsed"
+      :can-access-menus="canAccessMenus"
       :md-files="mdFiles"
       :md-files-by-date="mdFilesByDate"
       :open-md-date="openMdDate"
@@ -1201,6 +1550,10 @@ onUnmounted(() => {
         ref="terminalViewRef"
         :api-base-url="API_BASE_URL"
         :active="activeView === 'home'"
+        :is-logged-in="isLoggedIn"
+        :current-member="currentMember"
+        :logged-in-at="memberLoggedInAt"
+        :last-session-label="lastSessionLabel"
         @action="handleTerminalAction"
       />
 
@@ -1226,7 +1579,32 @@ onUnmounted(() => {
         @update-text="boardFormText = $event"
       />
 
-      <MemberView v-if="activeView === 'member'" />
+      <MemberView
+        v-if="activeView === 'member'"
+        :members="members"
+        :member-id="memberFormMemberId"
+        :password="memberFormPassword"
+        :name="memberFormName"
+        :email="memberFormEmail"
+        :level="memberFormLevel"
+        :yn-use="memberFormYnUse"
+        :editing-member-id="editingMemberId"
+        :error-message="memberErrorMessage"
+        :save-message="memberSaveMessage"
+        :is-loading="isMemberLoading"
+        :is-saving="isMemberSaving"
+        @refresh="loadMembers"
+        @save="saveMember"
+        @reset="resetMemberForm"
+        @edit="editMember"
+        @delete="deleteMember"
+        @update-member-id="memberFormMemberId = $event"
+        @update-password="memberFormPassword = $event"
+        @update-name="memberFormName = $event"
+        @update-email="memberFormEmail = $event"
+        @update-level="memberFormLevel = $event"
+        @update-yn-use="memberFormYnUse = $event"
+      />
 
       <ScheduleView
         v-if="activeView === 'schedule'"
@@ -1278,9 +1656,11 @@ onUnmounted(() => {
         :save-message="mailSaveMessage"
         :is-loading="isMailDetailLoading"
         :is-deleting="isMailDeleting"
+        :is-archiving="isMailArchiving"
         @back="closeMailDetail"
         @prev="goMailDetailPrev"
         @next="goMailDetailNext"
+        @archive-mail="archiveMailDetail"
         @delete-mail="deleteMailDetail"
       />
 

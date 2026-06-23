@@ -1,0 +1,137 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+		PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+		"https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.mtools.api.member.dao.MemberDao">
+
+	<resultMap id="MemberMap" type="com.mtools.api.member.service.Member">
+		<constructor>
+			<arg column="id_member" javaType="java.lang.String" />
+			<arg column="st_member" javaType="java.lang.String" />
+			<arg column="st_name" javaType="java.lang.String" />
+			<arg column="st_email" javaType="java.lang.String" />
+			<arg column="st_level" javaType="java.lang.String" />
+			<arg column="yn_use" javaType="java.lang.String" />
+			<arg column="inserted_at" javaType="java.lang.String" />
+			<arg column="updated_at" javaType="java.lang.String" />
+		</constructor>
+	</resultMap>
+
+	<select id="findAll" resultMap="MemberMap">
+		SELECT
+			id_member::text,
+			st_member,
+			st_name,
+			st_email,
+			st_level,
+			COALESCE(yn_use, 'Y') AS yn_use,
+			dt_insert::text AS inserted_at,
+			dt_update::text AS updated_at
+		FROM t_member
+		WHERE COALESCE(yn_use, 'Y') != 'N'
+		ORDER BY CAST(id_member AS BIGINT) ASC
+	</select>
+
+	<select id="findById" resultMap="MemberMap">
+		SELECT
+			id_member::text,
+			st_member,
+			st_name,
+			st_email,
+			st_level,
+			COALESCE(yn_use, 'Y') AS yn_use,
+			dt_insert::text AS inserted_at,
+			dt_update::text AS updated_at
+		FROM t_member
+		WHERE id_member::text = #{idMember}
+			AND COALESCE(yn_use, 'Y') != 'N'
+	</select>
+
+	<select id="findByMemberId" resultMap="MemberMap">
+		SELECT
+			id_member::text,
+			st_member,
+			st_name,
+			st_email,
+			st_level,
+			COALESCE(yn_use, 'Y') AS yn_use,
+			dt_insert::text AS inserted_at,
+			dt_update::text AS updated_at
+		FROM t_member
+		WHERE st_member = #{memberId}
+			AND COALESCE(yn_use, 'Y') != 'N'
+	</select>
+
+	<select id="findByLogin" resultMap="MemberMap">
+		SELECT
+			id_member::text,
+			st_member,
+			st_name,
+			st_email,
+			st_level,
+			COALESCE(yn_use, 'Y') AS yn_use,
+			dt_insert::text AS inserted_at,
+			dt_update::text AS updated_at
+		FROM t_member
+		WHERE st_member = #{memberId}
+			AND st_password = #{password}
+			AND COALESCE(yn_use, 'Y') = 'Y'
+	</select>
+
+	<select id="nextId" resultType="long">
+		SELECT COALESCE(MAX(CAST(id_member AS BIGINT)), 0) + 1
+		FROM t_member
+	</select>
+
+	<insert id="insert">
+		INSERT INTO t_member (
+			id_member,
+			st_member,
+			st_password,
+			st_name,
+			st_email,
+			st_level,
+			yn_use,
+			id_insert,
+			dt_insert
+		)
+		VALUES (
+			CAST(#{idMember} AS NUMERIC),
+			#{memberId},
+			#{password},
+			#{name},
+			#{email},
+			#{level},
+			#{ynUse},
+			CAST(#{idMember} AS NUMERIC),
+			CURRENT_TIMESTAMP
+		)
+	</insert>
+
+	<update id="update">
+		UPDATE t_member
+		SET
+			st_member = #{memberId},
+			<if test="password != null and password != ''">
+			st_password = #{password},
+			</if>
+			st_name = #{name},
+			st_email = #{email},
+			st_level = #{level},
+			yn_use = #{ynUse},
+			id_update = CAST(#{idMember} AS NUMERIC),
+			dt_update = CURRENT_TIMESTAMP
+		WHERE id_member::text = #{idMember}
+			AND COALESCE(yn_use, 'Y') != 'N'
+	</update>
+
+	<update id="delete">
+		UPDATE t_member
+		SET
+			yn_use = 'N',
+			id_update = CAST(#{idMember} AS NUMERIC),
+			dt_update = CURRENT_TIMESTAMP
+		WHERE id_member::text = #{idMember}
+	</update>
+</mapper>

@@ -175,3 +175,118 @@ export const buildMonthRange = (fromYm: string, toYm: string) => {
     timeMax: end.toISOString(),
   }
 }
+
+export const parseDottedYmd = (raw: string) => {
+  const match = raw.match(/^(\d{4})\.(\d{2})\.(\d{2})$/)
+
+  if (!match?.[1] || !match[2] || !match[3]) {
+    return null
+  }
+
+  return parseYmd(`${match[1]}${match[2]}${match[3]}`)
+}
+
+export const parseDottedYm = (raw: string) => {
+  const match = raw.match(/^(\d{4})\.(\d{2})$/)
+
+  if (!match?.[1] || !match[2]) {
+    return null
+  }
+
+  return parseYm(`${match[1]}${match[2]}`)
+}
+
+export const parseDottedYear = (raw: string) => parseYear(raw.replace(/\./g, ''))
+
+export const addMonthsToYmd = (ymd: string, months: number) => {
+  const parsed = parseYmd(ymd)
+
+  if (!parsed) {
+    return null
+  }
+
+  const date = new Date(parsed.year, parsed.month - 1 + months, parsed.day)
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+
+  return `${year}${month}${day}`
+}
+
+export const buildRelativeDateRange = (startOffsetDays: number, endOffsetDays: number) => {
+  const today = getTodayYmd()
+  const startYmd = addDaysToYmd(today, startOffsetDays)
+  const endYmd = addDaysToYmd(today, endOffsetDays)
+
+  if (!startYmd || !endYmd) {
+    return null
+  }
+
+  return buildDateRange(startYmd, endYmd)
+}
+
+export const buildWeekRangeForward = () => buildRelativeDateRange(0, 6)
+
+export const buildWeekRangeBackward = () => buildRelativeDateRange(-6, 0)
+
+export const buildMonthRangeForward = () => {
+  const today = getTodayYmd()
+  const endYmd = addMonthsToYmd(today, 1)
+
+  if (!endYmd) {
+    return null
+  }
+
+  return buildDateRange(today, endYmd)
+}
+
+export const buildMonthRangeBackward = () => {
+  const today = getTodayYmd()
+  const startYmd = addMonthsToYmd(today, -1)
+
+  if (!startYmd) {
+    return null
+  }
+
+  return buildDateRange(startYmd, today)
+}
+
+export const toYmdFromDotted = (dotted: string) => {
+  const parsed = parseDottedYmd(dotted)
+
+  if (!parsed) {
+    return null
+  }
+
+  const month = String(parsed.month).padStart(2, '0')
+  const day = String(parsed.day).padStart(2, '0')
+
+  return `${parsed.year}${month}${day}`
+}
+
+export const toYmFromDotted = (dotted: string) => {
+  const parsed = parseDottedYm(dotted)
+
+  if (!parsed) {
+    return null
+  }
+
+  return `${parsed.year}${String(parsed.month).padStart(2, '0')}`
+}
+
+export const toHmFromColon = (raw: string) => {
+  const match = raw.match(/^(\d{1,2}):(\d{2})$/)
+
+  if (!match?.[1] || !match[2]) {
+    return null
+  }
+
+  const hour = Number(match[1])
+  const minute = Number(match[2])
+
+  if (hour < 0 || hour > 23 || minute < 0 || minute > 59) {
+    return null
+  }
+
+  return `${String(hour).padStart(2, '0')}${String(minute).padStart(2, '0')}`
+}

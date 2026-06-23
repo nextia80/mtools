@@ -95,9 +95,11 @@ public class CalendarController {
 					request.calendarKey(),
 					request.summary(),
 					request.date(),
+					request.endDate(),
 					request.time(),
 					request.endTime(),
-					request.durationMinutes()
+					request.durationMinutes(),
+					request.description()
 			);
 		} catch (IllegalArgumentException exception) {
 			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, exception.getMessage());

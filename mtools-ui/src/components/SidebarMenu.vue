@@ -4,6 +4,7 @@ import type { ActiveView, MdFile, MdFileGroup } from '../types'
 defineProps<{
   activeView: ActiveView
   collapsed: boolean
+  canAccessMenus: boolean
   mdFiles: MdFile[]
   mdFilesByDate: MdFileGroup[]
   openMdDate: string
@@ -47,6 +48,7 @@ const formatMdMenuFileName = (name: string) =>
         <span class="menu-icon">1</span>
         <strong>터미널</strong>
       </button>
+      <template v-if="canAccessMenus">
       <div class="docs-menu-row">
         <button
           class="primary-menu-item docs-menu-button"
@@ -154,6 +156,7 @@ const formatMdMenuFileName = (name: string) =>
         <span class="menu-icon">8</span>
         <strong>API 테스트</strong>
       </button>
+      </template>
     </nav>
 
     <div class="sidebar-footer">

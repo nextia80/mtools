@@ -128,7 +128,8 @@ public class GoogleGmailService {
 
 	public MailMessagesPage fetchMessages(
 			Integer maxResults,
-			boolean unreadOnly,
+			String readFilter,
+			String q,
 			String pageToken
 	) throws IOException {
 		int limit = normalizeMaxResults(maxResults);
@@ -138,13 +139,8 @@ public class GoogleGmailService {
 				.build();
 
 		var listRequest = gmail.users().messages().list("me")
-				.setMaxResults((long) limit);
-
-		if (unreadOnly) {
-			listRequest.setQ("is:unread in:inbox");
-		} else {
-			listRequest.setLabelIds(List.of("INBOX"));
-		}
+				.setMaxResults((long) limit)
+				.setQ(buildMessagesQuery(readFilter, q));
 
 		if (pageToken != null && !pageToken.isBlank()) {
 			listRequest.setPageToken(pageToken);
@@ -165,7 +161,7 @@ public class GoogleGmailService {
 		}
 
 		String nextPageToken = listResponse.getNextPageToken();
-		long totalCount = unreadOnly ? labelCounts.unreadCount() : labelCounts.inboxTotalCount();
+		long totalCount = resolveTotalCount(readFilter, labelCounts);
 
 		return new MailMessagesPage(
 				result,
@@ -193,7 +189,7 @@ public class GoogleGmailService {
 	private record MailLabelCounts(long inboxTotalCount, long unreadCount) {
 	}
 
-	public MailMessageDetail fetchMessageDetail(String messageId) throws IOException {
+	public MailMessageDetail fetchMessageDetail(String messageId, boolean markRead) throws IOException {
 		if (messageId == null || messageId.isBlank()) {
 			throw new IllegalArgumentException("메일 ID가 필요합니다.");
 		}
@@ -208,7 +204,7 @@ public class GoogleGmailService {
 
 		boolean unread = message.getLabelIds() != null && message.getLabelIds().contains("UNREAD");
 
-		if (unread) {
+		if (markRead && unread) {
 			markMessageAsRead(gmail, messageId);
 			unread = false;
 		}
@@ -227,6 +223,56 @@ public class GoogleGmailService {
 				body.text(),
 				body.html()
 		);
+	}
+
+	public void markMessageAsRead(String messageId) throws IOException {
+		markMessageAsRead(buildGmailClient(), messageId);
+	}
+
+	public void archiveMessage(String messageId) throws IOException {
+		if (messageId == null || messageId.isBlank()) {
+			throw new IllegalArgumentException("메일 ID가 필요합니다.");
+		}
+
+		ModifyMessageRequest request = new ModifyMessageRequest()
+				.setRemoveLabelIds(List.of("INBOX"));
+
+		try {
+			buildGmailClient().users().messages().modify("me", messageId, request).execute();
+		} catch (com.google.api.client.googleapis.json.GoogleJsonResponseException exception) {
+			if (exception.getStatusCode() == 403) {
+				throw new IllegalStateException(MAIL_MODIFY_SCOPE_MESSAGE);
+			}
+
+			throw exception;
+		}
+	}
+
+	private String buildMessagesQuery(String readFilter, String extraQuery) {
+		StringBuilder query = new StringBuilder("in:inbox");
+		String normalizedFilter = readFilter == null ? "all" : readFilter.trim().toLowerCase();
+
+		if ("unread".equals(normalizedFilter) || "n".equals(normalizedFilter)) {
+			query.append(" is:unread");
+		} else if ("read".equals(normalizedFilter) || "r".equals(normalizedFilter)) {
+			query.append(" is:read");
+		}
+
+		if (extraQuery != null && !extraQuery.isBlank()) {
+			query.append(' ').append(extraQuery.trim());
+		}
+
+		return query.toString();
+	}
+
+	private long resolveTotalCount(String readFilter, MailLabelCounts labelCounts) {
+		String normalizedFilter = readFilter == null ? "all" : readFilter.trim().toLowerCase();
+
+		if ("unread".equals(normalizedFilter) || "n".equals(normalizedFilter)) {
+			return labelCounts.unreadCount();
+		}
+
+		return labelCounts.inboxTotalCount();
 	}
 
 	private void markMessageAsRead(Gmail gmail, String messageId) throws IOException {

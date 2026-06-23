@@ -1,17 +1,20 @@
 import { isHelpCommand } from './help'
+import { getGmReadInputDraft } from './commands/mailCommand'
+import { LOGIN_COMMAND, LOGIN_PW_CONTEXT, LOGOUT_COMMAND } from './textUtils'
 
 export type TerminalContext = string | null
 
-const ROOT_COMMANDS = ['bd', 'gc', 'md'] as const
+const ROOT_COMMANDS = ['bd', 'gc', 'gm', 'md'] as const
 type RootCommand = (typeof ROOT_COMMANDS)[number]
 
 const SUBCOMMANDS: Record<RootCommand, readonly string[]> = {
-  gc: ['l', 'c', 'a', 'm', 'r'],
+  gc: ['a', 'm', 'r'],
+  gm: ['r'],
   bd: ['l', 'lb', 'g', 'a', 'm', 'd'],
   md: ['ld', 'l', 'g'],
 }
 
-const GLOBAL_COMMANDS = new Set(['bd', 'gc', 'md', 'cd', 'cls'])
+const GLOBAL_COMMANDS = new Set(['bd', 'gc', 'gm', 'md', 'cd', 'cls', LOGIN_COMMAND, LOGOUT_COMMAND])
 
 const isRootCommand = (value: string): value is RootCommand =>
   (ROOT_COMMANDS as readonly string[]).includes(value)
@@ -24,14 +27,52 @@ const joinContext = (parts: string[]) => parts.join(' ')
 
 export const isCdCommand = (input: string) => /^cd(?:\s|$)/i.test(input.trim())
 
-const isGcListArg = (input: string) => {
-  const firstToken = input.trim().split(/\s+/)[0] ?? ''
+const isGmQueryArg = (input: string) => {
+  const trimmed = input.trim()
+  const firstToken = trimmed.split(/\s+/)[0] ?? ''
 
-  if (/^-k$/i.test(firstToken) || /^--y$/i.test(firstToken) || /^-c$/i.test(firstToken)) {
+  if (/^-(?:l|s|k)$/i.test(firstToken)) {
     return true
   }
 
-  return /^\d{8}(?:~\d{8})?$/.test(firstToken)
+  if (/^\d{4}\.\d{2}(?:\.\d{2})?(?:~\d{4}\.\d{2}(?:\.\d{2})?)?$/.test(firstToken)) {
+    return true
+  }
+
+  if (/^\d{4}(?:~\d{4})?$/.test(firstToken)) {
+    return true
+  }
+
+  if (/^(today|-week|-month)$/i.test(firstToken)) {
+    return true
+  }
+
+  return false
+}
+
+const MAIL_REF_PATTERN = /^\d{4}-\d+$/
+
+const isGcQueryArg = (input: string) => {
+  const trimmed = input.trim()
+  const firstToken = trimmed.split(/\s+/)[0] ?? ''
+
+  if (/^-(?:l|s|c|k)$/i.test(firstToken)) {
+    return true
+  }
+
+  if (/^\d{4}\.\d{2}(?:\.\d{2})?(?:~\d{4}\.\d{2}(?:\.\d{2})?)?$/.test(firstToken)) {
+    return true
+  }
+
+  if (/^\d{4}(?:~\d{4})?$/.test(firstToken)) {
+    return true
+  }
+
+  if (/^(today|week|-week|month|-month)$/i.test(firstToken)) {
+    return true
+  }
+
+  return false
 }
 
 export const resolveCommandInput = (
@@ -48,11 +89,11 @@ export const resolveCommandInput = (
     return trimmed
   }
 
-  if (trimmed === '-?') {
+  if (trimmed === '?') {
     const root = context.split(/\s+/)[0] ?? ''
 
     if (isRootCommand(root)) {
-      return `${root} -?`
+      return `${root} ?`
     }
   }
 
@@ -64,7 +105,37 @@ export const resolveCommandInput = (
 
   const contextParts = parseContextParts(context)
 
+  if (contextParts[0] === LOGIN_COMMAND) {
+    if (contextParts[1] === 'pw') {
+      return `${LOGIN_PW_CONTEXT} ${trimmed}`
+    }
+
+    return `${LOGIN_COMMAND} ${trimmed}`
+  }
+
   if (contextParts.length >= 2) {
+    const root = contextParts[0] as RootCommand
+    const sub = contextParts[1] ?? ''
+
+    if (root === 'gm' && sub === 'r') {
+      const ref = contextParts[2] ?? ''
+      const readCommand = ref ? `gm r ${ref}` : (getGmReadInputDraft() ?? 'gm r')
+
+      if (/^r$/i.test(trimmed)) {
+        return 'gm r'
+      }
+
+      if (/^\/(?:r|n|b|d|k|list|0)$/i.test(trimmed)) {
+        return `${readCommand} ${trimmed}`
+      }
+
+      if (MAIL_REF_PATTERN.test(trimmed.split(/\s+/)[0] ?? '')) {
+        return `gm r ${trimmed}`
+      }
+
+      return `${readCommand} ${trimmed}`
+    }
+
     return `${context} ${trimmed}`
   }
 
@@ -75,8 +146,24 @@ export const resolveCommandInput = (
       return `${root} ${trimmed}`
     }
 
-    if (root === 'gc' && isGcListArg(trimmed)) {
-      return `${root} l ${trimmed}`
+    if (root === 'gc' && isGcQueryArg(trimmed)) {
+      const firstToken = trimmed.split(/\s+/)[0] ?? ''
+
+      if (/^-(?:l|s|c|k)$/i.test(firstToken)) {
+        return `${root} ${trimmed}`
+      }
+
+      return `${root} -s ${trimmed}`
+    }
+
+    if (root === 'gm' && isGmQueryArg(trimmed)) {
+      const firstToken = trimmed.split(/\s+/)[0] ?? ''
+
+      if (/^-(?:l|s|k)$/i.test(firstToken)) {
+        return `${root} ${trimmed}`
+      }
+
+      return `${root} -s ${trimmed}`
     }
 
     return `${root} ${trimmed}`
@@ -93,7 +180,7 @@ export const parseCdCommand = (
 
   if (!body) {
     return {
-      error: '사용법: cd gc | cd l | cd / | cd /gc | cd /gc/l | cd /bd',
+      error: '사용법: cd gc | cd gm | cd / | cd /gc | cd /gm | cd /bd | cd /md',
     }
   }
 

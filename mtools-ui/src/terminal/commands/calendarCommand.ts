@@ -5,7 +5,24 @@ import type {
   TerminalLineDraft,
 } from '../../types'
 import { fetchJson, requestJson } from '../apiClient'
-import { buildDateRange, buildDayRange, buildMonthRange, buildWeekRangeFromToday, buildYearRange, getTodayYmd, parseYmd } from '../dateUtils'
+import {
+  buildDateRange,
+  buildDayRange,
+  buildMonthRange,
+  buildMonthRangeBackward,
+  buildMonthRangeForward,
+  buildWeekRangeBackward,
+  buildWeekRangeForward,
+  buildYearRange,
+  getTodayYmd,
+  parseDottedYm,
+  parseDottedYmd,
+  parseDottedYear,
+  parseYmd,
+  toHmFromColon,
+  toYmFromDotted,
+  toYmdFromDotted,
+} from '../dateUtils'
 import { matchLike } from '../textUtils'
 import type { TerminalCommandResult } from '../types'
 
@@ -13,7 +30,7 @@ const CALENDAR_LIST_KEY_WIDTH = 8
 const EVENT_REF_WIDTH = 12
 
 const GC_USAGE =
-  '사용법: gc l [YYYYMMDD|YYYYMMDD~YYYYMMDD|--y 기간] [-c n[,n]] [-k "키워드"] | gc a "<내용>" [날짜] [시간] [-c n] | gc m <캘린더-MMDD-순번> [-t "<제목>"] [-d "<메모>"] [-c n] | gc r <캘린더-MMDD-순번> | gc c'
+  '사용법: gc [-s 일자] [-c n[,n]] [-k "키워드"] | gc -l c | gc a -t "<제목>" [-s 일자] [-c n] [-d "<메모>"] | gc m <캘린더-MMDD-순번> [옵션] | gc r <캘린더-MMDD-순번>'
 
 const EVENT_REF_PATTERN = /^(\d+)-(\d{4})-(\d+)$/
 
@@ -27,11 +44,6 @@ type EventWithRef = CalendarEvent & {
   ref: string
 }
 
-type ParsedCalendarFlag = {
-  keys?: number[]
-  rest: string
-}
-
 type ParsedDateArg = {
   timeMin?: string
   timeMax?: string
@@ -42,6 +54,22 @@ type ParsedTimeArg = {
   time?: string
   endTime?: string
   durationMinutes?: number
+  error?: string
+}
+
+type GcQueryFlags = {
+  listType?: 'c'
+  schedule?: string
+  calendarKeys?: number[]
+  keyword?: string
+  error?: string
+}
+
+type GcAddFlags = {
+  title?: string
+  schedule?: string
+  calendarKey?: number
+  description?: string
   error?: string
 }
 
@@ -97,73 +125,423 @@ const computeEndHm = (startHm: string, durationMinutes: number) => {
   return `${String(endHour).padStart(2, '0')}${String(endMinute).padStart(2, '0')}`
 }
 
-type ParsedListFlags = {
-  keys?: number[]
-  keyword?: string
-  periodToken?: string
-  rest: string
-  error?: string
-}
+const parseTodayDateArg = (): ParsedDateArg => {
+  const range = buildDayRange(getTodayYmd())
 
-const extractCalendarFlag = (input: string): ParsedCalendarFlag => {
-  const match = input.match(/(?:^|\s)-c\s+(\d+(?:\s*,\s*\d+)*)/i)
-
-  if (!match?.[1]) {
-    return { rest: input.trim() }
+  if (!range) {
+    return { error: '오늘 날짜를 계산하지 못했습니다.' }
   }
 
-  const keys = match[1].split(',').map((key) => Number(key.trim()))
-  const rest = input.replace(match[0], ' ').replace(/\s+/g, ' ').trim()
-
-  return { keys, rest }
+  return { timeMin: range.timeMin, timeMax: range.timeMax }
 }
 
-const extractListFlags = (input: string): ParsedListFlags => {
-  let rest = input.trim()
-  let keys: number[] | undefined
-  let keyword: string | undefined
-  let periodToken: string | undefined
+const parseGcScheduleRange = (token: string): ParsedDateArg => {
+  const trimmed = token.trim()
 
-  while (true) {
-    const calendarMatch = rest.match(/(?:^|\s)-c\s+(\d+(?:\s*,\s*\d+)*)/i)
+  if (trimmed === 'today') {
+    return parseTodayDateArg()
+  }
+
+  if (trimmed === 'week') {
+    const range = buildWeekRangeForward()
+
+    if (!range) {
+      return { error: '1주일 날짜 범위를 계산하지 못했습니다.' }
+    }
+
+    if ('invalidOrder' in range) {
+      return { error: '날짜 범위를 계산하지 못했습니다.' }
+    }
+
+    return { timeMin: range.timeMin, timeMax: range.timeMax }
+  }
+
+  if (trimmed === '-week') {
+    const range = buildWeekRangeBackward()
+
+    if (!range) {
+      return { error: '1주일 전 날짜 범위를 계산하지 못했습니다.' }
+    }
+
+    if ('invalidOrder' in range) {
+      return { error: '날짜 범위를 계산하지 못했습니다.' }
+    }
+
+    return { timeMin: range.timeMin, timeMax: range.timeMax }
+  }
+
+  if (trimmed === 'month') {
+    const range = buildMonthRangeForward()
+
+    if (!range) {
+      return { error: '한 달 날짜 범위를 계산하지 못했습니다.' }
+    }
+
+    if ('invalidOrder' in range) {
+      return { error: '날짜 범위를 계산하지 못했습니다.' }
+    }
+
+    return { timeMin: range.timeMin, timeMax: range.timeMax }
+  }
+
+  if (trimmed === '-month') {
+    const range = buildMonthRangeBackward()
+
+    if (!range) {
+      return { error: '한 달 전 날짜 범위를 계산하지 못했습니다.' }
+    }
+
+    if ('invalidOrder' in range) {
+      return { error: '날짜 범위를 계산하지 못했습니다.' }
+    }
+
+    return { timeMin: range.timeMin, timeMax: range.timeMax }
+  }
+
+  if (trimmed.includes('~')) {
+    const [fromRaw = '', toRaw = ''] = trimmed.split('~')
+
+    if (parseDottedYmd(fromRaw) && parseDottedYmd(toRaw)) {
+      const fromYmd = toYmdFromDotted(fromRaw)
+      const toYmd = toYmdFromDotted(toRaw)
+
+      if (!fromYmd || !toYmd) {
+        return { error: '날짜 형식이 올바르지 않습니다. 예: gc -s 2026.01.01~2026.01.30' }
+      }
+
+      const range = buildDateRange(fromYmd, toYmd)
+
+      if (!range) {
+        return { error: '날짜 형식이 올바르지 않습니다. 예: gc -s 2026.01.01~2026.01.30' }
+      }
+
+      if ('invalidOrder' in range) {
+        return { error: '날짜 범위는 시작 ≤ 끝 이어야 합니다.' }
+      }
+
+      return { timeMin: range.timeMin, timeMax: range.timeMax }
+    }
+
+    if (parseDottedYm(fromRaw) && parseDottedYm(toRaw)) {
+      const fromYm = toYmFromDotted(fromRaw)
+      const toYm = toYmFromDotted(toRaw)
+
+      if (!fromYm || !toYm) {
+        return { error: '년월 형식이 올바르지 않습니다. 예: gc -s 2026.01~2026.06' }
+      }
+
+      const range = buildMonthRange(fromYm, toYm)
+
+      if (!range) {
+        return { error: '년월 형식이 올바르지 않습니다. 예: gc -s 2026.01~2026.06' }
+      }
+
+      if ('invalidOrder' in range) {
+        return { error: '년월 범위는 시작 ≤ 끝 이어야 합니다.' }
+      }
+
+      return { timeMin: range.timeMin, timeMax: range.timeMax }
+    }
+
+    if (parseDottedYear(fromRaw) && parseDottedYear(toRaw)) {
+      const range = buildYearRange(fromRaw, toRaw)
+
+      if (!range) {
+        return { error: '년도 형식이 올바르지 않습니다. 예: gc -s 2025~2026' }
+      }
+
+      if ('invalidOrder' in range) {
+        return { error: '년도 범위는 시작 ≤ 끝 이어야 합니다.' }
+      }
+
+      return { timeMin: range.timeMin, timeMax: range.timeMax }
+    }
+
+    return { error: '기간 형식을 확인하세요. 예: 2026.01.01~2026.01.30, 2026.01~2026.06, 2025~2026' }
+  }
+
+  if (parseDottedYmd(trimmed)) {
+    const ymd = toYmdFromDotted(trimmed)
+
+    if (!ymd) {
+      return { error: '날짜 형식이 올바르지 않습니다. 예: gc -s 2026.01.01' }
+    }
+
+    const range = buildDayRange(ymd)
+
+    if (!range) {
+      return { error: '날짜 형식이 올바르지 않습니다. 예: gc -s 2026.01.01' }
+    }
+
+    return { timeMin: range.timeMin, timeMax: range.timeMax }
+  }
+
+  if (parseDottedYm(trimmed)) {
+    const ym = toYmFromDotted(trimmed)
+
+    if (!ym) {
+      return { error: '년월 형식이 올바르지 않습니다. 예: gc -s 2026.06' }
+    }
+
+    const range = buildMonthRange(ym, ym)
+
+    if (!range) {
+      return { error: '년월 형식이 올바르지 않습니다. 예: gc -s 2026.06' }
+    }
+
+    if ('invalidOrder' in range) {
+      return { error: '년월 범위를 계산하지 못했습니다.' }
+    }
+
+    return { timeMin: range.timeMin, timeMax: range.timeMax }
+  }
+
+  if (parseDottedYear(trimmed)) {
+    const range = buildYearRange(trimmed, trimmed)
+
+    if (!range) {
+      return { error: '년도 형식이 올바르지 않습니다. 예: gc -s 2026' }
+    }
+
+    if ('invalidOrder' in range) {
+      return { error: '년도 범위를 계산하지 못했습니다.' }
+    }
+
+    return { timeMin: range.timeMin, timeMax: range.timeMax }
+  }
+
+  return {
+    error:
+      '일자 형식: today, week, -week, month, -month, yyyy, yyyy~yyyy, yyyy.mm, yyyy.mm~yyyy.mm, yyyy.mm.dd, yyyy.mm.dd~yyyy.mm.dd',
+  }
+}
+
+const parseGcAddSchedule = (token: string): {
+  date?: string
+  dateEnd?: string
+  time?: string
+  endTime?: string
+  durationMinutes?: number
+  error?: string
+} => {
+  const trimmed = token.trim()
+
+  if (trimmed === 'today') {
+    return { date: getTodayYmd() }
+  }
+
+  const rangeMatch = trimmed.match(/^(\d{4}\.\d{2}\.\d{2})~(\d{4}\.\d{2}\.\d{2})(?::.+)?$/)
+
+  if (rangeMatch?.[1] && rangeMatch[2]) {
+    const date = toYmdFromDotted(rangeMatch[1])
+    const dateEnd = toYmdFromDotted(rangeMatch[2])
+
+    if (!date || !dateEnd) {
+      return { error: '날짜 형식이 올바르지 않습니다. 예: gc a -t "회의" -s 2026.01.01~2026.01.30' }
+    }
+
+    const range = buildDateRange(date, dateEnd)
+
+    if (!range || 'invalidOrder' in range) {
+      return { error: '날짜 범위는 시작 ≤ 끝 이어야 합니다.' }
+    }
+
+    return { date, dateEnd }
+  }
+
+  const timedDurationMatch = trimmed.match(/^(\d{4}\.\d{2}\.\d{2}):(\d{1,2}:\d{2})\+(\d+(?:\.\d+)?)h$/i)
+
+  if (timedDurationMatch?.[1] && timedDurationMatch[2] && timedDurationMatch[3]) {
+    const date = toYmdFromDotted(timedDurationMatch[1])
+    const time = toHmFromColon(timedDurationMatch[2])
+    const hours = Number(timedDurationMatch[3])
+
+    if (!date || !time) {
+      return { error: '날짜·시간 형식이 올바르지 않습니다. 예: gc a -t "회의" -s 2026.01.01:09:00+1h' }
+    }
+
+    if (!Number.isFinite(hours) || hours <= 0) {
+      return { error: '시간 길이는 0보다 커야 합니다. 예: 2026.01.01:09:00+1h' }
+    }
+
+    return { date, time, durationMinutes: Math.round(hours * 60) }
+  }
+
+  const timedRangeMatch = trimmed.match(/^(\d{4}\.\d{2}\.\d{2}):(\d{1,2}:\d{2})~:(\d{1,2}:\d{2})$/)
+
+  if (timedRangeMatch?.[1] && timedRangeMatch[2] && timedRangeMatch[3]) {
+    const date = toYmdFromDotted(timedRangeMatch[1])
+    const time = toHmFromColon(timedRangeMatch[2])
+    const endTime = toHmFromColon(timedRangeMatch[3])
+
+    if (!date || !time || !endTime) {
+      return { error: '날짜·시간 형식이 올바르지 않습니다. 예: gc a -t "회의" -s 2026.01.01:09:00~:10:00' }
+    }
+
+    return { date, time, endTime }
+  }
+
+  const timedMatch = trimmed.match(/^(\d{4}\.\d{2}\.\d{2}):(\d{1,2}:\d{2})$/)
+
+  if (timedMatch?.[1] && timedMatch[2]) {
+    const date = toYmdFromDotted(timedMatch[1])
+    const time = toHmFromColon(timedMatch[2])
+
+    if (!date || !time) {
+      return { error: '날짜·시간 형식이 올바르지 않습니다. 예: gc a -t "회의" -s 2026.01.01:09:00' }
+    }
+
+    return { date, time, durationMinutes: 60 }
+  }
+
+  if (parseDottedYmd(trimmed)) {
+    const date = toYmdFromDotted(trimmed)
+
+    if (!date) {
+      return { error: '날짜 형식이 올바르지 않습니다. 예: gc a -t "회의" -s 2026.01.01' }
+    }
+
+    return { date }
+  }
+
+  return { error: '일정 일자 형식: today, yyyy.mm.dd, yyyy.mm.dd~yyyy.mm.dd, yyyy.mm.dd:hh:mm, yyyy.mm.dd:hh:mm~:hh:mm, yyyy.mm.dd:hh:mm+nh' }
+}
+
+const extractGcQueryFlags = (input: string): GcQueryFlags => {
+  let rest = input.trim()
+  const flags: GcQueryFlags = {}
+
+  while (rest.length > 0) {
+    const listMatch = rest.match(/^-l\s+(\S+)/i)
+
+    if (listMatch?.[1]) {
+      if (listMatch[1].toLowerCase() !== 'c') {
+        return { error: '-l 옵션은 c(카테고리 리스트)만 지원합니다. 예: gc -l c' }
+      }
+
+      flags.listType = 'c'
+      rest = rest.slice(listMatch[0].length).trim()
+      continue
+    }
+
+    const scheduleMatch = rest.match(/^-s\s+(\S+)/i)
+
+    if (scheduleMatch?.[1]) {
+      flags.schedule = scheduleMatch[1]
+      rest = rest.slice(scheduleMatch[0].length).trim()
+      continue
+    }
+
+    const calendarMatch = rest.match(/^-c\s+(\d+(?:\s*,\s*\d+)*)/i)
 
     if (calendarMatch?.[1]) {
-      keys = calendarMatch[1].split(',').map((key) => Number(key.trim()))
-      rest = rest.replace(calendarMatch[0], ' ').replace(/\s+/g, ' ').trim()
+      flags.calendarKeys = calendarMatch[1].split(',').map((key) => Number(key.trim()))
+      rest = rest.slice(calendarMatch[0].length).trim()
       continue
     }
 
-    const keywordFlagMatch = rest.match(/(?:^|\s)-k\s+/i)
+    const keywordMatch = rest.match(/^-k\s+/i)
 
-    if (keywordFlagMatch?.index !== undefined) {
-      const valueStart = keywordFlagMatch.index + keywordFlagMatch[0].length
-      const quoted = consumeQuotedString(rest.slice(valueStart))
+    if (keywordMatch) {
+      const quoted = consumeQuotedString(rest.slice(keywordMatch[0].length))
 
       if ('error' in quoted) {
-        return { rest, error: '검색 키워드를 따옴표("")로 감싸세요.' }
+        return { error: '검색 키워드를 따옴표("")로 감싸세요.' }
       }
 
-      keyword = quoted.value
-      rest = `${rest.slice(0, keywordFlagMatch.index)} ${quoted.rest}`.replace(/\s+/g, ' ').trim()
+      flags.keyword = quoted.value
+      rest = quoted.rest
       continue
     }
 
-    const periodFlagMatch = rest.match(/(?:^|\s)--y\s+(\S+)/i)
-
-    if (periodFlagMatch?.[1]) {
-      if (periodToken) {
-        return { rest, error: '--y는 한 번만 지정할 수 있습니다.' }
-      }
-
-      periodToken = periodFlagMatch[1]
-      rest = rest.replace(periodFlagMatch[0], ' ').replace(/\s+/g, ' ').trim()
-      continue
+    if (rest.length > 0) {
+      return { error: `알 수 없는 옵션: ${rest.split(/\s+/)[0]}` }
     }
-
-    break
   }
 
-  return { keys, keyword, periodToken, rest }
+  return flags
+}
+
+const extractGcAddFlags = (input: string): GcAddFlags => {
+  let rest = input.trim()
+  const flags: GcAddFlags = {}
+
+  while (rest.length > 0) {
+    const titleMatch = rest.match(/^-t\s+/i)
+
+    if (titleMatch) {
+      const quoted = consumeQuotedString(rest.slice(titleMatch[0].length))
+
+      if ('error' in quoted) {
+        return { error: quoted.error }
+      }
+
+      flags.title = quoted.value
+      rest = quoted.rest
+      continue
+    }
+
+    const scheduleMatch = rest.match(/^-s\s+(\S+)/i)
+
+    if (scheduleMatch?.[1]) {
+      flags.schedule = scheduleMatch[1]
+      rest = rest.slice(scheduleMatch[0].length).trim()
+      continue
+    }
+
+    const calendarMatch = rest.match(/^-c\s+(\d+)/i)
+
+    if (calendarMatch?.[1]) {
+      flags.calendarKey = Number(calendarMatch[1])
+      rest = rest.slice(calendarMatch[0].length).trim()
+      continue
+    }
+
+    const descriptionMatch = rest.match(/^-d\s+/i)
+
+    if (descriptionMatch) {
+      const quoted = consumeQuotedString(rest.slice(descriptionMatch[0].length))
+
+      if ('error' in quoted) {
+        return { error: quoted.error }
+      }
+
+      flags.description = quoted.value
+      rest = quoted.rest
+      continue
+    }
+
+    return { error: `알 수 없는 옵션: ${rest.split(/\s+/)[0]}` }
+  }
+
+  return flags
+}
+
+const parseModifyOptions = (input: string): { options: ModifyOptions; error?: string } => {
+  const parsed = extractGcAddFlags(input)
+  const options: ModifyOptions = {}
+
+  if (parsed.error) {
+    return { options, error: parsed.error }
+  }
+
+  if (parsed.title !== undefined) {
+    options.title = parsed.title
+  }
+
+  if (parsed.description !== undefined) {
+    options.description = parsed.description
+  }
+
+  if (parsed.calendarKey !== undefined) {
+    options.calendarKey = parsed.calendarKey
+  }
+
+  if (parsed.schedule !== undefined) {
+    return { options, error: '일정 수정은 -s 일자 변경을 지원하지 않습니다. -t, -d, -c 만 사용하세요.' }
+  }
+
+  return { options }
 }
 
 const eventMatchesKeyword = (event: CalendarEvent, keyword: string) => {
@@ -181,213 +559,6 @@ const eventMatchesKeyword = (event: CalendarEvent, keyword: string) => {
   ]
 
   return fields.some((field) => matchLike(field.toLowerCase(), pattern))
-}
-
-const parseTodayDateArg = (): ParsedDateArg => {
-  const range = buildDayRange(getTodayYmd())
-
-  if (!range) {
-    return { error: '오늘 날짜를 계산하지 못했습니다.' }
-  }
-
-  return { timeMin: range.timeMin, timeMax: range.timeMax }
-}
-
-const parseListDateArg = (token?: string): ParsedDateArg => {
-  if (!token) {
-    const range = buildWeekRangeFromToday()
-
-    if (!range) {
-      return { error: '1주일 날짜 범위를 계산하지 못했습니다.' }
-    }
-
-    if ('invalidOrder' in range) {
-      return { error: '날짜 범위를 계산하지 못했습니다.' }
-    }
-
-    return { timeMin: range.timeMin, timeMax: range.timeMax }
-  }
-
-  const rangeMatch = token.match(/^(\d{8})~(\d{8})$/)
-
-  if (rangeMatch?.[1] && rangeMatch[2]) {
-    const range = buildDateRange(rangeMatch[1], rangeMatch[2])
-
-    if (!range) {
-      return { error: '날짜는 YYYYMMDD 형식이어야 합니다. 예: gc l 20260618~20260625' }
-    }
-
-    if ('invalidOrder' in range) {
-      return { error: '날짜 범위는 시작 날짜 ≤ 끝 날짜여야 합니다.' }
-    }
-
-    return { timeMin: range.timeMin, timeMax: range.timeMax }
-  }
-
-  if (!parseYmd(token)) {
-    return { error: '날짜는 YYYYMMDD 형식이어야 합니다. 예: gc l 20260618' }
-  }
-
-  const range = buildDayRange(token)
-
-  if (!range) {
-    return { error: '날짜는 YYYYMMDD 형식이어야 합니다. 예: gc l 20260618' }
-  }
-
-  return { timeMin: range.timeMin, timeMax: range.timeMax }
-}
-
-const parseYearRangeToken = (token: string): ParsedDateArg => {
-  const [fromYear = '', toYear = fromYear] = token.split('~')
-
-  if (!/^\d{4}$/.test(fromYear) || !/^\d{4}$/.test(toYear)) {
-    return { error: '년도는 YYYY 또는 YYYY~YYYY 형식이어야 합니다. 예: --y 2026' }
-  }
-
-  const range = buildYearRange(fromYear, toYear)
-
-  if (!range) {
-    return { error: '년도는 YYYY 또는 YYYY~YYYY 형식이어야 합니다. 예: --y 2026' }
-  }
-
-  if ('invalidOrder' in range) {
-    return { error: '년도 범위는 시작 년도 ≤ 끝 년도여야 합니다.' }
-  }
-
-  return { timeMin: range.timeMin, timeMax: range.timeMax }
-}
-
-const parseMonthRangeToken = (token: string): ParsedDateArg => {
-  const [fromYm = '', toYm = fromYm] = token.split('~')
-
-  if (!/^\d{6}$/.test(fromYm) || !/^\d{6}$/.test(toYm)) {
-    return { error: '년월은 YYYYMM 또는 YYYYMM~YYYYMM 형식이어야 합니다. 예: --y 202606' }
-  }
-
-  const range = buildMonthRange(fromYm, toYm)
-
-  if (!range) {
-    return { error: '년월은 YYYYMM 또는 YYYYMM~YYYYMM 형식이어야 합니다. 예: --y 202606' }
-  }
-
-  if ('invalidOrder' in range) {
-    return { error: '년월 범위는 시작 ≤ 끝 이어야 합니다.' }
-  }
-
-  return { timeMin: range.timeMin, timeMax: range.timeMax }
-}
-
-const parsePeriodRangeToken = (token: string): ParsedDateArg => {
-  const [from = '', to = from] = token.split('~')
-  const isYearRange = /^\d{4}$/.test(from) && /^\d{4}$/.test(to)
-  const isMonthRange = /^\d{6}$/.test(from) && /^\d{6}$/.test(to)
-
-  if (isYearRange) {
-    return parseYearRangeToken(token)
-  }
-
-  if (isMonthRange) {
-    return parseMonthRangeToken(token)
-  }
-
-  return {
-    error: '기간은 YYYY, YYYY~YYYY, YYYYMM, YYYYMM~YYYYMM 형식이어야 합니다. 예: --y 2026',
-  }
-}
-
-const resolveListDateArg = (
-  dateToken: string,
-  periodToken?: string,
-): ParsedDateArg => {
-  if (periodToken && dateToken) {
-    return { error: '날짜는 YYYYMMDD, --y 기간 중 하나만 지정하세요.' }
-  }
-
-  if (periodToken) {
-    return parsePeriodRangeToken(periodToken)
-  }
-
-  return parseListDateArg(dateToken || undefined)
-}
-
-const parseTimeArg = (token?: string): ParsedTimeArg => {
-  if (!token) {
-    return {}
-  }
-
-  const rangeMatch = token.match(/^(\d{4})~(\d{4})$/)
-
-  if (rangeMatch?.[1] && rangeMatch[2]) {
-    return { time: rangeMatch[1], endTime: rangeMatch[2] }
-  }
-
-  const durationMatch = token.match(/^(\d{4})\+(\d+(?:\.\d+)?)h$/i)
-
-  if (durationMatch?.[1] && durationMatch[2]) {
-    const hours = Number(durationMatch[2])
-
-    if (!Number.isFinite(hours) || hours <= 0) {
-      return { error: '시간 길이는 0보다 커야 합니다. 예: 1900+1.5h' }
-    }
-
-    return {
-      time: durationMatch[1],
-      durationMinutes: Math.round(hours * 60),
-    }
-  }
-
-  if (!/^\d{4}$/.test(token)) {
-    return { error: '시간은 HHmm, HHmm~HHmm, HHmm+nh 형식이어야 합니다.' }
-  }
-
-  return { time: token }
-}
-
-const parseModifyOptions = (input: string): { options: ModifyOptions; error?: string } => {
-  const options: ModifyOptions = {}
-  let rest = input.trim()
-
-  while (rest.length > 0) {
-    const titleMatch = rest.match(/^-t\s+/i)
-
-    if (titleMatch) {
-      const quoted = consumeQuotedString(rest.slice(titleMatch[0].length))
-
-      if ('error' in quoted) {
-        return { options, error: quoted.error }
-      }
-
-      options.title = quoted.value
-      rest = quoted.rest
-      continue
-    }
-
-    const descriptionMatch = rest.match(/^-d\s+/i)
-
-    if (descriptionMatch) {
-      const quoted = consumeQuotedString(rest.slice(descriptionMatch[0].length))
-
-      if ('error' in quoted) {
-        return { options, error: quoted.error }
-      }
-
-      options.description = quoted.value
-      rest = quoted.rest
-      continue
-    }
-
-    const calendarMatch = rest.match(/^-c\s+(\d+)/i)
-
-    if (calendarMatch?.[1]) {
-      options.calendarKey = Number(calendarMatch[1])
-      rest = rest.slice(calendarMatch[0].length).trim()
-      continue
-    }
-
-    return { options, error: `알 수 없는 수정 옵션: ${rest.split(/\s+/)[0]}` }
-  }
-
-  return { options }
 }
 
 const formatCalendarList = (calendars: CalendarListItem[]): TerminalLineDraft[] => {
@@ -418,7 +589,7 @@ const resolveEventCalendarKey = (event: CalendarEvent): number | null =>
   event.calendarKey ?? parseCalendarKeyFromName(event.calendarName)
 
 const formatCalendarListHeader = (): TerminalLineDraft[] => [
-  { type: 'output', text: '캘린더 번호: 이름 앞 숫자(1., 2., ...). 일정 키: 캘린더-MMDD-순번 (예: 1-0618-2)' },
+  { type: 'output', text: '카테고리 번호 · 이름. 일정 키: 캘린더-MMDD-순번 (예: 1-0623-2)' },
 ]
 
 const getEventDateYmd = (event: CalendarEvent) => event.start.slice(0, 10)
@@ -674,14 +845,14 @@ const resolveDefaultCalendarKey = async (apiBaseUrl: string): Promise<number> =>
   const calendars = await fetchJson<CalendarListItem[]>(`${apiBaseUrl}/api/calendar/calendars`)
 
   if (calendars.length === 0) {
-    throw new Error('사용 가능한 캘린더가 없습니다. 캘린더 이름이 "1.", "2." 형식인지 gc c 로 확인하세요.')
+    throw new Error('사용 가능한 캘린더가 없습니다. gc -l c 로 카테고리를 확인하세요.')
   }
 
   const sorted = [...calendars].sort((calendarA, calendarB) => calendarA.key - calendarB.key)
   const first = sorted[0]
 
   if (!first) {
-    throw new Error('사용 가능한 캘린더가 없습니다. 캘린더 이름이 "1.", "2." 형식인지 gc c 로 확인하세요.')
+    throw new Error('사용 가능한 캘린더가 없습니다. gc -l c 로 카테고리를 확인하세요.')
   }
 
   return first.key
@@ -693,9 +864,11 @@ const createGcEvent = async (
   options: {
     calendarKey?: number
     date?: string
+    dateEnd?: string
     time?: string
     endTime?: string
     durationMinutes?: number
+    description?: string
   },
 ): Promise<TerminalLineDraft[]> => {
   const connectionError = await ensureCalendarConnected(apiBaseUrl)
@@ -707,6 +880,20 @@ const createGcEvent = async (
   const calendarKey = options.calendarKey !== undefined
     ? options.calendarKey
     : await resolveDefaultCalendarKey(apiBaseUrl)
+
+  if (options.dateEnd && options.date) {
+    const body = {
+      summary,
+      calendarKey,
+      date: options.date,
+      endDate: options.dateEnd,
+      description: options.description,
+    }
+
+    const event = await requestJson<CalendarEvent>(`${apiBaseUrl}/api/calendar/events`, 'POST', body)
+
+    return [{ type: 'output', text: formatCreatedEventMessage(event) }]
+  }
 
   const body: Record<string, unknown> = {
     summary,
@@ -729,6 +916,10 @@ const createGcEvent = async (
 
   if (options.durationMinutes !== undefined) {
     body.durationMinutes = options.durationMinutes
+  }
+
+  if (options.description) {
+    body.description = options.description
   }
 
   const event = await requestJson<CalendarEvent>(`${apiBaseUrl}/api/calendar/events`, 'POST', body)
@@ -762,7 +953,7 @@ const resolveEventReference = async (
 
   if (cached) {
     if (calendarKey !== undefined && cached.calendarKey !== calendarKey) {
-      return { error: `${reference} 일정은 ${cached.calendarKey}번 캘린더에 있습니다.` }
+      return { error: `${reference} 일정은 ${cached.calendarKey}번 카테고리에 있습니다.` }
     }
 
     return cached
@@ -772,7 +963,7 @@ const resolveEventReference = async (
 
   if (parsed) {
     if (calendarKey !== undefined && parsed.calendarKey !== calendarKey) {
-      return { error: `${reference} 일정은 ${parsed.calendarKey}번 캘린더에 있습니다.` }
+      return { error: `${reference} 일정은 ${parsed.calendarKey}번 카테고리에 있습니다.` }
     }
 
     const ymd = buildYmdFromMmdd(parsed.mmdd)
@@ -780,7 +971,7 @@ const resolveEventReference = async (
     const found = assignEventRefs(events).find((event) => event.ref === reference)
 
     if (!found) {
-      return { error: `일정을 찾을 수 없습니다: ${reference}. gc l 로 일정을 확인하세요.` }
+      return { error: `일정을 찾을 수 없습니다: ${reference}. gc 로 일정을 확인하세요.` }
     }
 
     return {
@@ -794,14 +985,14 @@ const resolveEventReference = async (
 
   if (cachedById) {
     if (calendarKey !== undefined && cachedById.calendarKey !== calendarKey) {
-      return { error: `해당 일정은 ${cachedById.calendarKey}번 캘린더에 있습니다.` }
+      return { error: `해당 일정은 ${cachedById.calendarKey}번 카테고리에 있습니다.` }
     }
 
     return cachedById
   }
 
   if (calendarKey === undefined) {
-    return { error: '일정 키 형식: 캘린더-MMDD-순번 (예: 1-0618-2). gc l 로 목록을 확인하세요.' }
+    return { error: '일정 키 형식: 캘린더-MMDD-순번 (예: 1-0623-2). gc 로 목록을 확인하세요.' }
   }
 
   return {
@@ -880,80 +1071,67 @@ const modifyGcEvent = async (
   return [{ type: 'output', text: formatUpdatedEventMessage(event, resolved.ref) }]
 }
 
-const handleListCommand = async (apiBaseUrl: string, rest: string): Promise<TerminalCommandResult> => {
-  const { keys, keyword, periodToken, rest: datePart, error } = extractListFlags(rest)
-
-  if (error) {
-    return errorLines(error)
+const handleQueryCommand = async (
+  apiBaseUrl: string,
+  flags: GcQueryFlags,
+): Promise<TerminalCommandResult> => {
+  if (flags.error) {
+    return errorLines(flags.error)
   }
 
-  const parsedDate = resolveListDateArg(datePart.trim(), periodToken)
+  if (flags.listType === 'c') {
+    return { lines: await fetchGcCalendars(apiBaseUrl) }
+  }
+
+  let parsedDate: ParsedDateArg = {}
+
+  if (flags.schedule) {
+    parsedDate = parseGcScheduleRange(flags.schedule)
+  } else {
+    parsedDate = parseTodayDateArg()
+  }
 
   if (parsedDate.error) {
     return errorLines(parsedDate.error)
   }
 
   return {
-    lines: await fetchGcEvents(apiBaseUrl, parsedDate.timeMin, parsedDate.timeMax, keys, keyword),
+    lines: await fetchGcEvents(
+      apiBaseUrl,
+      parsedDate.timeMin,
+      parsedDate.timeMax,
+      flags.calendarKeys,
+      flags.keyword,
+    ),
   }
 }
 
 const handleAddCommand = async (apiBaseUrl: string, rest: string): Promise<TerminalCommandResult> => {
-  const body = rest.replace(/^a\s+/i, '').trim()
-  const hadCalendarFlag = /(?:^|\s)-c\s+\d+/i.test(body)
-  const { keys, rest: bodyWithoutCalendar } = extractCalendarFlag(body)
+  const flags = extractGcAddFlags(rest.replace(/^a\s+/i, '').trim())
 
-  if (hadCalendarFlag && !keys?.length) {
-    return errorLines('-c 캘린더 번호를 읽지 못했습니다. 예: gc a "회의" 20260618 -c 1')
+  if (flags.error) {
+    return errorLines(flags.error)
   }
 
-  const quoted = consumeQuotedString(bodyWithoutCalendar.trim())
-
-  if ('error' in quoted) {
-    return errorLines(quoted.error)
+  if (!flags.title?.trim()) {
+    return errorLines('제목이 필요합니다. 예: gc a -t "팀 미팅"')
   }
 
-  if (!quoted.value.trim()) {
-    return errorLines('일정 제목을 입력하세요. 예: gc a "팀 미팅"')
-  }
+  const schedule = flags.schedule ? parseGcAddSchedule(flags.schedule) : { date: getTodayYmd() }
 
-  const tokens = quoted.rest.split(/\s+/).filter(Boolean)
-  const dateToken = tokens[0]
-  const timeToken = tokens[1]
-
-  let date: string | undefined
-  let timeArg: ParsedTimeArg = {}
-
-  if (dateToken) {
-    if (!parseYmd(dateToken) && !/^\d{4}(?:~|\+|$)/.test(dateToken)) {
-      return errorLines('날짜는 YYYYMMDD 형식이어야 합니다. 예: gc a "회의" 20260618')
-    }
-
-    if (parseYmd(dateToken)) {
-      date = dateToken
-      timeArg = parseTimeArg(timeToken)
-    } else {
-      timeArg = parseTimeArg(dateToken)
-    }
-  }
-
-  if (timeArg.error) {
-    return errorLines(timeArg.error)
-  }
-
-  const calendarKey = keys?.[0]
-
-  if (hadCalendarFlag && calendarKey === undefined) {
-    return errorLines('-c 캘린더 번호를 읽지 못했습니다. 예: gc a "회의" 20260618 -c 1')
+  if (schedule.error) {
+    return errorLines(schedule.error)
   }
 
   return {
-    lines: await createGcEvent(apiBaseUrl, quoted.value.trim(), {
-      calendarKey,
-      date,
-      time: timeArg.time,
-      endTime: timeArg.endTime,
-      durationMinutes: timeArg.durationMinutes,
+    lines: await createGcEvent(apiBaseUrl, flags.title.trim(), {
+      calendarKey: flags.calendarKey,
+      date: schedule.date,
+      dateEnd: schedule.dateEnd,
+      time: schedule.time,
+      endTime: schedule.endTime,
+      durationMinutes: schedule.durationMinutes,
+      description: flags.description,
     }),
   }
 }
@@ -962,7 +1140,7 @@ const handleRemoveCommand = async (apiBaseUrl: string, rest: string): Promise<Te
   const reference = rest.replace(/^r\s+/i, '').trim().split(/\s+/)[0] ?? ''
 
   if (!reference) {
-    return errorLines('삭제할 일정 키를 입력하세요. 예: gc r 1-0618-2')
+    return errorLines('삭제할 일정 키를 입력하세요. 예: gc r 1-0623-2')
   }
 
   return {
@@ -975,7 +1153,7 @@ const handleModifyCommand = async (apiBaseUrl: string, rest: string): Promise<Te
   const spaceIndex = withoutCommand.search(/\s/)
 
   if (spaceIndex < 0) {
-    return errorLines('수정할 일정 키를 입력하세요. 예: gc m 1-0618-2 -t "새 제목"')
+    return errorLines('수정할 일정 키를 입력하세요. 예: gc m 1-0623-2 -t "새 제목"')
   }
 
   const reference = withoutCommand.slice(0, spaceIndex).trim()
@@ -999,18 +1177,34 @@ const handleModifyCommand = async (apiBaseUrl: string, rest: string): Promise<Te
   }
 }
 
+const isLegacyListCommand = (rest: string) =>
+  /^l(?:\s|$)/i.test(rest) || /^c$/i.test(rest) || /^l$/i.test(rest)
+
+const convertLegacyListToFlags = (rest: string): string => {
+  if (/^c$/i.test(rest)) {
+    return '-l c'
+  }
+
+  const body = rest.replace(/^l\s*/i, '').trim()
+  const parts: string[] = []
+
+  if (body) {
+    if (/^-/.test(body)) {
+      return body
+    }
+
+    parts.push(`-s ${body}`)
+  }
+
+  return parts.join(' ')
+}
+
 export const executeGcCommand = async (
   trimmed: string,
   apiBaseUrl: string,
 ): Promise<TerminalCommandResult> => {
   if (trimmed.trim().toLowerCase() === 'gc') {
-    const today = parseTodayDateArg()
-
-    if (today.error) {
-      return errorLines(today.error)
-    }
-
-    return { lines: await fetchGcEvents(apiBaseUrl, today.timeMin, today.timeMax) }
+    return handleQueryCommand(apiBaseUrl, {})
   }
 
   const rest = trimmed.replace(/^gc\s+/i, '').trim()
@@ -1019,17 +1213,15 @@ export const executeGcCommand = async (
     return errorLines(GC_USAGE)
   }
 
-  if (/^c$/i.test(rest)) {
-    return { lines: await fetchGcCalendars(apiBaseUrl) }
+  if (isLegacyListCommand(rest)) {
+    const flags = extractGcQueryFlags(convertLegacyListToFlags(rest))
+
+    return handleQueryCommand(apiBaseUrl, flags)
   }
 
-  if (/^l(?:\s|$)/i.test(rest) || /^l$/i.test(rest)) {
-    return handleListCommand(apiBaseUrl, rest.replace(/^l\s*/i, '').trim())
-  }
-
-  if (/^a\s+/i.test(rest) || /^a$/i.test(rest)) {
+  if (/^a(?:\s|$)/i.test(rest)) {
     if (/^a$/i.test(rest)) {
-      return errorLines('일정 제목을 따옴표로 입력하세요. 예: gc a "종일 마일스톤 회의"')
+      return errorLines('제목이 필요합니다. 예: gc a -t "종일 마일스톤 회의"')
     }
 
     return handleAddCommand(apiBaseUrl, rest)
@@ -1041,6 +1233,12 @@ export const executeGcCommand = async (
 
   if (/^m(?:\s|$)/i.test(rest)) {
     return handleModifyCommand(apiBaseUrl, rest)
+  }
+
+  if (/-[lsck]/i.test(rest)) {
+    const flags = extractGcQueryFlags(rest)
+
+    return handleQueryCommand(apiBaseUrl, flags)
   }
 
   return errorLines(GC_USAGE)
