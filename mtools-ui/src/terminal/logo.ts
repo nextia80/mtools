@@ -19,7 +19,7 @@ export { bannerBarLine }
 
 export const mtoolsLogoLines = (): TerminalLineDraft[] => [
   { type: 'output', text: MTOOLS_ASCII, logo: true },
-  { type: 'output', text: 'Terminal Web System', logoSubtitle: true },
+  { type: 'output', text: 'Terminal Web System ver 1.0', logoSubtitle: true },
 ]
 
 export const prependLogo = (lines: TerminalLineDraft[]): TerminalLineDraft[] => [
